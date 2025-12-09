@@ -2,11 +2,26 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFirestore, doc, setDoc, updateDoc, arrayUnion, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// --- CONFIGURATION ---
 const ADMIN_EMAIL = "bryan.drouet24@gmail.com"; 
-const BOOSTER_SIZE = 5; // Nombre de cartes par booster
+const BOOSTER_SIZE = 5; 
 const COOLDOWN_MINUTES = 5; 
 
+// --- CONFIG FIREBASE ---
+const firebaseConfig = {
+    apiKey: "AIzaSyBdtS508E3KBTZHfOTb7kl-XDc9vVn3oZI",
+    authDomain: "tcgp-27e34.firebaseapp.com",
+    projectId: "tcgp-27e34",
+    storageBucket: "tcgp-27e34.firebasestorage.app",
+    messagingSenderId: "7412987658",
+    appId: "1:7412987658:web:87f0a63b9b7c95548bacf3"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const provider = new GoogleAuthProvider();
+
+// (GAME_CONFIG reste inchangé avec tes icônes locales...)
 const GAME_CONFIG = {
     dropRates: [
         { type: 'common',     chance: 55,  filename: 'common.json', label: "Commune", weight: 1 },
@@ -15,7 +30,6 @@ const GAME_CONFIG = {
         { type: 'ultra_rare', chance: 5,   filename: 'ultra_rare.json', label: "Ultra Rare", weight: 4 },
         { type: 'secret',     chance: 1,   filename: 'secret.json', label: "SECRÈTE", weight: 5 }
     ],
-    // ... (GARDE TES ICONES ICI, JE LES AI COUPÉES POUR LA LISIBILITÉ) ...
     icons: {
         Fire: 'icons/Pokémon_Fire_Type_Icon.svg',
         Water: 'icons/Pokémon_Water_Type_Icon.svg',
@@ -39,67 +53,99 @@ const GAME_CONFIG = {
     }
 };
 
-// ⚠️ COLLE TA CONFIG FIREBASE ICI ⚠️
-const firebaseConfig = {
-    apiKey: "AIzaSyBdtS508E3KBTZHfOTb7kl-XDc9vVn3oZI",
-    authDomain: "tcgp-27e34.firebaseapp.com",
-    projectId: "tcgp-27e34",
-    storageBucket: "tcgp-27e34.firebasestorage.app",
-    messagingSenderId: "7412987658",
-    appId: "1:7412987658:web:87f0a63b9b7c95548bacf3"
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const provider = new GoogleAuthProvider();
-
-// Variables globales pour le tri
 let userCardsCache = []; 
 let cooldownInterval = null;
 
+// --- GESTION POPUP (Remplace Alert) ---
+window.showPopup = (title, msg) => {
+    document.getElementById('popup-title').innerText = title;
+    document.getElementById('popup-msg').innerText = msg;
+    document.getElementById('custom-popup-overlay').style.display = 'flex';
+};
+window.closePopup = () => {
+    document.getElementById('custom-popup-overlay').style.display = 'none';
+};
+
 // --- AUTHENTIFICATION ---
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
+    const loader = document.getElementById('global-loader');
+    
     if (user) {
         document.getElementById('auth-overlay').style.display = 'none';
         document.getElementById('game-app').style.display = 'block';
         document.getElementById('user-display').innerText = user.email.split('@')[0];
         
-        // Admin Panel
-        const adminPanel = document.getElementById('admin-panel');
-        if (adminPanel) adminPanel.style.display = (user.email === ADMIN_EMAIL) ? 'block' : 'none';
+        // ADMIN LINK
+        const isAdmin = (user.email === ADMIN_EMAIL);
+        document.getElementById('admin-link-container').style.display = isAdmin ? 'block' : 'none';
 
-        loadCollection(user.uid);
-        checkCooldown(user); // Vérifie le temps restant
+        // Check Notifications permission on first load
+        checkNotificationStatus();
+
+        await loadCollection(user.uid);
+        if (!isAdmin) await checkCooldown(user.uid);
+        else enableBoosterButton(true);
+
+        loader.style.display = 'none';
     } else {
-        document.getElementById('auth-overlay').style.display = 'flex';
         document.getElementById('game-app').style.display = 'none';
+        document.getElementById('auth-overlay').style.display = 'flex';
         if(cooldownInterval) clearInterval(cooldownInterval);
+        loader.style.display = 'none';
     }
 });
 
-// (Fonctions Auth inchangées : googleLogin, signUp, signIn, logout...)
-window.googleLogin = async () => authUser(signInWithPopup(auth, provider));
-window.signUp = async () => { /* ... */ };
-window.signIn = async () => { /* ... */ };
-window.logout = () => signOut(auth);
-async function authUser(promise) { /* ... */ }
-
-
-// --- COOLDOWN SYSTEM ---
-async function checkCooldown(user) {
-    // Si c'est l'admin, pas de cooldown
-    if (user.email === ADMIN_EMAIL) {
-        enableBoosterButton(true);
+// --- NOTIFICATIONS SYSTEM ---
+window.requestNotification = async () => {
+    if (!("Notification" in window)) {
+        window.showPopup("Erreur", "Votre navigateur ne supporte pas les notifications.");
         return;
     }
-
-    const docRef = doc(db, "players", user.uid);
-    const snap = await getDoc(docRef);
     
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") {
+        window.showPopup("Succès", "Notifications activées ! Vous serez averti quand un booster sera prêt.");
+        document.getElementById('notif-bell').classList.add('bell-active');
+        new Notification("Poké-TCG", { body: "Les notifications fonctionnent !", icon: "icons/Pokémon_Normal_Type_Icon.svg" });
+    } else {
+        window.showPopup("Refusé", "Vous avez bloqué les notifications.");
+        document.getElementById('notif-bell').classList.remove('bell-active');
+    }
+};
+
+function checkNotificationStatus() {
+    if (Notification.permission === "granted") {
+        document.getElementById('notif-bell').classList.add('bell-active');
+    } else if (Notification.permission === "default") {
+        // Demande automatique à la première connexion si pas encore décidé
+        if (!localStorage.getItem('notifAsked')) {
+            window.requestNotification();
+            localStorage.setItem('notifAsked', 'true');
+        }
+    }
+}
+
+function sendReadyNotification() {
+    if (Notification.permission === "granted") {
+        new Notification("Booster Prêt ! 🎁", {
+            body: "Votre délai d'attente est terminé. Venez ouvrir vos cartes !",
+            icon: "icons/Pokémon_Fire_Type_Icon.svg"
+        });
+    }
+}
+
+// (Auth Functions: googleLogin, etc...)
+window.googleLogin = async () => authUser(signInWithPopup(auth, provider));
+window.signUp = async () => { const e = document.getElementById('email').value; const p = document.getElementById('password').value; authUser(createUserWithEmailAndPassword(auth, e, p)); };
+window.signIn = async () => { try { await signInWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('password').value); } catch(e) { window.showPopup("Erreur", e.message); } };
+window.logout = () => signOut(auth);
+async function authUser(promise) { try { const res = await promise; const ref = doc(db, "players", res.user.uid); const snap = await getDoc(ref); if (!snap.exists()) await setDoc(ref, { email: res.user.email, collection: [], lastDrawTime: 0 }); } catch (e) { console.error(e); } }
+
+// --- COOLDOWN ---
+async function checkCooldown(uid) {
+    const snap = await getDoc(doc(db, "players", uid));
     if (snap.exists()) {
-        const data = snap.data();
-        const lastDraw = data.lastDrawTime || 0;
+        const lastDraw = snap.data().lastDrawTime || 0;
         const now = Date.now();
         const diff = now - lastDraw;
         const cooldownMs = COOLDOWN_MINUTES * 60 * 1000;
@@ -116,65 +162,65 @@ async function checkCooldown(user) {
 
 function startTimer(durationMs) {
     const btn = document.getElementById('btn-draw');
-    const timerDiv = document.getElementById('cooldown-timer');
-    const timerVal = document.getElementById('timer-val');
+    const display = document.getElementById('cooldown-display');
+    const val = document.getElementById('timer-val');
     
     btn.disabled = true;
     btn.classList.add('disabled');
-    timerDiv.style.display = 'block';
+    btn.innerHTML = `<div class="booster-content">RECHARGEMENT...</div>`;
+    display.style.display = 'block';
 
     let remaining = durationMs;
-
     if (cooldownInterval) clearInterval(cooldownInterval);
 
-    cooldownInterval = setInterval(() => {
+    const tick = () => {
         remaining -= 1000;
-        
         if (remaining <= 0) {
             clearInterval(cooldownInterval);
             enableBoosterButton(true);
+            sendReadyNotification(); // Envoi la notif !
             return;
         }
-
         const m = Math.floor((remaining / 1000 / 60) % 60);
         const s = Math.floor((remaining / 1000) % 60);
-        timerVal.innerText = `${m}:${s < 10 ? '0'+s : s}`;
-        btn.innerHTML = `<div class="booster-content">Attente... ${m}:${s < 10 ? '0'+s : s}</div>`;
-    }, 1000);
+        val.innerText = `${m}:${s < 10 ? '0'+s : s}`;
+    };
+    tick();
+    cooldownInterval = setInterval(tick, 1000);
 }
 
 function enableBoosterButton(enabled) {
     const btn = document.getElementById('btn-draw');
-    const timerDiv = document.getElementById('cooldown-timer');
-    
+    const display = document.getElementById('cooldown-display');
     if (enabled) {
         btn.disabled = false;
         btn.classList.remove('disabled');
         btn.innerHTML = '<div class="booster-content">OUVRIR UN BOOSTER</div>';
-        timerDiv.style.display = 'none';
+        display.style.display = 'none';
         if (cooldownInterval) clearInterval(cooldownInterval);
     }
 }
 
-
-// --- OUVERTURE DE BOOSTER (5 CARTES) ---
+// --- DRAW ---
 window.drawCard = async () => {
     const user = auth.currentUser;
     if (!user) return;
 
+    const isAdmin = (user.email === ADMIN_EMAIL);
     const genSelect = document.getElementById('gen-select');
     const selectedGen = genSelect.value;
     const btn = document.getElementById('btn-draw');
+
+    if (!isAdmin && btn.disabled) return;
 
     btn.disabled = true;
     btn.innerHTML = "Ouverture...";
 
     try {
         const newCards = [];
+        const packSize = Math.random() < 0.5 ? 5 : 6;
 
-        // On boucle 5 fois pour générer 5 cartes
-        for(let i=0; i<BOOSTER_SIZE; i++) {
-            // 1. Rareté
+        for(let i=0; i<packSize; i++) {
             const rand = Math.random() * 100;
             let rarityConfig = GAME_CONFIG.dropRates[0];
             let acc = 0;
@@ -183,180 +229,110 @@ window.drawCard = async () => {
                 if (rand <= acc) { rarityConfig = r; break; }
             }
 
-            // 2. Récupération fichier
             const response = await fetch(`data/${selectedGen}/${rarityConfig.filename}`);
             if (!response.ok) {
-                // Fallback si fichier vide (ex: pas de secret dans cette gen)
-                const fallback = await fetch(`data/${selectedGen}/common.json`);
-                var list = await fallback.json();
-                rarityConfig = GAME_CONFIG.dropRates[0]; // Force commune
+                var list = await (await fetch(`data/${selectedGen}/common.json`)).json();
+                rarityConfig = GAME_CONFIG.dropRates[0];
             } else {
                 var list = await response.json();
             }
 
-            if(!list || list.length === 0) continue; // Skip si vide
+            if(!list || list.length === 0) continue; 
 
             const card = list[Math.floor(Math.random() * list.length)];
-            
-            // 3. Préparation Objet
             card.acquiredAt = Date.now();
             card.rarityKey = rarityConfig.type;
-            card.rarityWeight = rarityConfig.weight; // Important pour le tri !
+            card.rarityWeight = rarityConfig.weight;
             card.generation = selectedGen;
             
             newCards.push(card);
         }
 
-        // 4. Sauvegarde Unique (Optimisation)
-        const updateData = {
-            collection: arrayUnion(...newCards)
-        };
-        
-        // Si pas admin, on met à jour le cooldown
-        if (user.email !== ADMIN_EMAIL) {
-            updateData.lastDrawTime = Date.now();
-        }
+        const updateData = { collection: arrayUnion(...newCards) };
+        if (!isAdmin) updateData.lastDrawTime = Date.now();
 
         await updateDoc(doc(db, "players", user.uid), updateData);
 
-        // 5. Mise à jour UI
-        newCards.forEach(c => {
-            userCardsCache.push(c); // Ajout au cache local
-            renderCard(c, true); // Affichage
-        });
-        
+        newCards.forEach(c => { userCardsCache.push(c); renderCard(c, true); });
         updateCount(newCards.length);
-        
-        // Relancer le cooldown si nécessaire
-        if (user.email !== ADMIN_EMAIL) {
-            startTimer(COOLDOWN_MINUTES * 60 * 1000);
-        } else {
-            btn.disabled = false;
-            btn.innerHTML = '<div class="booster-content">OUVRIR UN BOOSTER</div>';
-        }
+
+        if (!isAdmin) startTimer(COOLDOWN_MINUTES * 60 * 1000);
+        else { btn.disabled = false; btn.innerHTML = '<div class="booster-content">OUVRIR UN BOOSTER</div>'; }
 
     } catch (error) {
-        console.error(error);
-        alert("Erreur: " + error.message);
+        window.showPopup("Erreur", error.message);
         btn.disabled = false;
     }
 };
 
-
-// --- GESTION COLLECTION & TRI ---
-
+// ... (Fonctions loadCollection, updateSort, renderCard : copie-les du code précédent, elles ne changent pas sauf alert() remplacé par window.showPopup())
 async function loadCollection(uid) {
     const snap = await getDoc(doc(db, "players", uid));
     if (snap.exists()) {
         userCardsCache = snap.data().collection || [];
-        updateCount(0); // Just update text
-        window.updateSort(); // Appliquer le tri par défaut
+        document.getElementById('card-count').innerText = userCardsCache.length;
+        window.updateSort();
     }
 }
 
-// Fonction appelée par le <select onchange="updateSort()">
 window.updateSort = () => {
     const sortType = document.getElementById('sort-select').value;
+    const searchText = document.getElementById('search-input').value.toLowerCase().trim();
     const grid = document.getElementById('cards-grid');
-    grid.innerHTML = ''; // Clear
+    grid.innerHTML = '';
 
-    // Logique de tri
-    const sorted = [...userCardsCache].sort((a, b) => {
+    let filtered = userCardsCache.filter(c => c.name.toLowerCase().includes(searchText));
+
+    filtered.sort((a, b) => {
         switch(sortType) {
-            case 'date-desc': // Plus récent
-                return b.acquiredAt - a.acquiredAt;
-            
-            case 'rarity-desc': // Rareté (Poids 5 > 4 > 3...)
-                // Si même rareté, on trie par nom
-                if ((b.rarityWeight || 0) !== (a.rarityWeight || 0)) {
-                    return (b.rarityWeight || 0) - (a.rarityWeight || 0);
-                }
+            case 'date-desc': return b.acquiredAt - a.acquiredAt;
+            case 'rarity-desc': 
+                if ((b.rarityWeight||0) !== (a.rarityWeight||0)) return (b.rarityWeight||0) - (a.rarityWeight||0);
                 return a.name.localeCompare(b.name);
-
-            case 'hp-desc': // PV
-                return (b.hp || 0) - (a.hp || 0);
-
-            case 'gen-asc': // Génération (gen1 < gen2)
-                if (a.generation !== b.generation) {
-                    return a.generation.localeCompare(b.generation);
-                }
-                return (b.rarityWeight || 0) - (a.rarityWeight || 0);
-            
+            case 'hp-desc': return (b.hp||0) - (a.hp||0);
+            case 'name-asc': return a.name.localeCompare(b.name);
+            case 'gen-asc': 
+                if (a.generation !== b.generation) return a.generation.localeCompare(b.generation);
+                return (b.rarityWeight||0) - (a.rarityWeight||0);
             default: return 0;
         }
     });
 
-    sorted.forEach(c => renderCard(c, false));
-    document.getElementById('card-count').innerText = sorted.length;
+    if(filtered.length === 0) grid.innerHTML = '<div style="text-align:center; padding:20px; opacity:0.5;">Aucune carte trouvée</div>';
+    filtered.forEach(c => renderCard(c, false));
+    document.getElementById('card-count').innerText = filtered.length;
 };
 
-function updateCount(n) {
-    // Si n=0 on ne change pas la longueur réelle
-    // Ici on relit juste la taille du cache
-    document.getElementById('card-count').innerText = userCardsCache.length;
-}
-
-// --- RENDER CARD (Mise à jour pour les Badges) ---
 function renderCard(card, animate = false) {
     const grid = document.getElementById('cards-grid');
     const div = document.createElement('div');
-    
     const mainType = card.types[0];
     const cssRarity = card.rarityKey ? card.rarityKey.replace('_', '-') : 'commune';
-    // Mapping pour le badge (Texte propre)
-    const rarityLabels = {
-        'common': 'COMMUNE', 'uncommon': 'PEU COM.', 'rare': 'RARE', 
-        'ultra_rare': 'ULTRA RARE', 'secret': 'SECRET'
-    };
-    const rarityLabel = rarityLabels[card.rarityKey] || '';
+    const labels = {'common':'COMMUNE', 'uncommon':'PEU COM.', 'rare':'RARE', 'ultra_rare':'ULTRA RARE', 'secret':'SECRET'};
+    const label = labels[card.rarityKey] || '';
+    const icon = GAME_CONFIG.icons[mainType] || GAME_CONFIG.icons['Normal'];
+    const weak = GAME_CONFIG.icons[card.weakness] || GAME_CONFIG.icons['Normal'];
 
-    const typeIconUrl = GAME_CONFIG.icons[mainType] || GAME_CONFIG.icons['Normal'];
-    const weakIconUrl = GAME_CONFIG.icons[card.weakness] || GAME_CONFIG.icons['Normal'];
-    
     div.className = `tcg-card ${cssRarity} bg-${mainType}`;
     if (animate) div.style.animation = "popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
 
-    // Attaques
-    let attacksHtml = '';
-    if(card.attacks) {
-        card.attacks.forEach(atk => {
-            const costHtml = Array(atk.cost).fill(`<img src="${typeIconUrl}" class="type-icon small">`).join('');
-            attacksHtml += `
-                <div class="move-row">
-                    <div class="cost-icons">${costHtml}</div>
-                    <div class="move-info"><div class="move-name">${atk.name}</div></div>
-                    <div class="move-dmg">${atk.damage}</div>
-                </div>`;
-        });
-    }
+    let attacks = '';
+    if(card.attacks) card.attacks.forEach(a => {
+        attacks += `<div class="move-row"><div class="cost-icons">${Array(a.cost).fill(`<img src="${icon}" class="type-icon small">`).join('')}</div><div class="move-info"><div class="move-name">${a.name}</div></div><div class="move-dmg">${a.damage}</div></div>`;
+    });
 
-    // Gestion image
     const img = document.createElement('img');
     img.src = card.image;
     img.className = 'card-img';
     img.loading = 'lazy';
-    img.onerror = () => { console.log("Img error", card.name); };
-
-    // HTML Structure avec Badge Rareté
+    
     div.innerHTML = `
-        ${rarityLabel !== 'COMMUNE' ? `<div class="rarity-badge badge-${cssRarity}">${rarityLabel}</div>` : ''}
-        
-        <div class="card-header">
-            <span class="card-name">${card.name}</span>
-            <div class="hp-group">${card.hp} PV <img src="${typeIconUrl}" class="type-icon big"></div>
-        </div>
+        ${label !== 'COMMUNE' ? `<div class="rarity-badge badge-${cssRarity}">${label}</div>` : ''}
+        <div class="card-header"><span class="card-name">${card.name}</span><div class="hp-group">${card.hp} PV <img src="${icon}" class="type-icon big"></div></div>
         <div class="img-frame"></div>
-        <div class="card-body">${attacksHtml}</div>
-        <div class="card-footer">
-            <div class="stat-box">Faiblesse<br>${card.weakness !== "Standard" ? `<img src="${weakIconUrl}" class="type-icon small">` : "-"}</div>
-            <div class="stat-box">Résist.<br>-</div>
-            <div class="stat-box">Retraite<br>⚪</div>
-        </div>
+        <div class="card-body">${attacks}</div>
+        <div class="card-footer"><div class="stat-box">Faiblesse<br><img src="${weak}" class="type-icon small"></div><div class="stat-box">Résist.<br>-</div><div class="stat-box">Retraite<br>⚪</div></div>
     `;
-    
     div.querySelector('.img-frame').appendChild(img);
-    
-    // Si on trie, on ajoute à la fin, sinon (animation draw) au début
-    if(animate) grid.prepend(div);
-    else grid.appendChild(div);
+    if(animate) grid.prepend(div); else grid.appendChild(div);
 }

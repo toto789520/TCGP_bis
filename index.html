@@ -6,48 +6,53 @@
     <title>Poké-TCG Ultimate</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 </head>
 <body>
 
-    <div id="auth-overlay">
+    <div id="custom-popup-overlay" style="display: none;">
+        <div class="popup-box">
+            <div id="popup-title" class="popup-title">TITRE</div>
+            <div id="popup-msg" class="popup-msg">Message</div>
+            <button onclick="closePopup()" class="btn-popup">OK</button>
+        </div>
+    </div>
+
+    <div id="global-loader">
+        <div class="pokeball-spinner"><div class="pokeball-top"></div><div class="pokeball-bottom"></div><div class="pokeball-center"></div></div>
+        <h2>Chargement...</h2>
+    </div>
+
+    <div id="auth-overlay" style="display:none;">
         <div class="login-box">
             <img src="https://upload.wikimedia.org/wikipedia/commons/9/98/International_Pok%C3%A9mon_logo.svg" alt="Logo" class="logo-img">
             <h2>Espace Dresseur</h2>
-            
-            <button onclick="googleLogin()" class="btn-google">
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" alt="G"> 
-                Connexion Google
-            </button>
-
+            <button onclick="googleLogin()" class="btn-google"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18"> Connexion Google</button>
             <div class="divider">OU</div>
-
-            <input type="email" id="email" placeholder="Email" autocomplete="username" aria-label="Adresse Email">
-            <input type="password" id="password" placeholder="Mot de passe" autocomplete="current-password" aria-label="Mot de passe">
-            
+            <input type="email" id="email" placeholder="Email" autocomplete="username">
+            <input type="password" id="password" placeholder="Mot de passe" autocomplete="current-password">
             <div class="btn-group">
                 <button onclick="signIn()" class="btn-secondary">Connexion</button>
-                <button onclick="signUp()" class="btn-primary">Créer compte</button>
+                <button onclick="signUp()" class="btn-primary">Créer</button>
             </div>
             <p id="auth-msg"></p>
         </div>
     </div>
 
     <div id="game-app" style="display:none;">
-        
         <nav>
             <div class="nav-logo">TCG <span class="version">Ultimate</span></div>
             <div class="player-stats">
-                <span class="user-pill">👤 <span id="user-display">Joueur</span></span>
-                <span class="user-pill">🃏 <span id="card-count">0</span> Cartes</span>
+                <span id="notif-bell" class="notification-bell" title="Activer les notifications" onclick="requestNotification()">🔔</span>
+                
+                <span class="user-pill">👤 <span id="user-display">...</span></span>
+                <span class="user-pill">🃏 <span id="card-count">0</span></span>
                 <button onclick="logout()" class="btn-logout">Sortir</button>
             </div>
         </nav>
 
         <div class="action-area">
-            
             <div class="custom-select-wrapper">
                 <label>SÉLECTION DU BOOSTER</label>
                 <div class="select-container">
@@ -64,57 +69,40 @@
                 </div>
             </div>
 
-            <button onclick="drawCard()" id="btn-draw" class="btn-booster">
-                <div class="booster-content">OUVRIR UN BOOSTER</div>
+            <button onclick="drawCard()" id="btn-draw" class="btn-booster" disabled>
+                <div class="booster-content">VÉRIFICATION...</div>
             </button>
             
-            <details class="admin-zone" id="admin-panel" style="display: none;">
-                <summary>🛠️ Admin & Générateur</summary>
-                <p>Télécharge les données JSON (Gen 1 à 7) pour le jeu.</p>
-                <button onclick="downloadAllGensZip()" class="btn-admin">💾 TÉLÉCHARGER TOUT (ZIP)</button>
-            </details>
-        </div>
-
-        <div class="toolbar">
-            <div class="sort-controls">
-                <label>Trier par :</label>
-                <select id="sort-select" onchange="updateSort()">
-                    <option value="date-desc">📅 Récents</option>
-                    <option value="rarity-desc">💎 Rareté (Meilleures d'abord)</option>
-                    <option value="hp-desc">❤️ PV (Plus forts d'abord)</option>
-                    <option value="gen-asc">cw Génération</option>
-                </select>
+            <div id="cooldown-display" style="display:none; margin-top:10px; color:#ff6b6b; font-weight:bold;">
+                ⏳ Prochain booster dans : <span id="timer-val">00:00</span>
             </div>
-            <div id="cooldown-timer" style="display:none;">Prochain booster dans : <span id="timer-val">00:00</span></div>
-        </div>
-
-        <div id="cards-grid" class="grid-container">
+            
+            <div class="toolbar">
+                <div class="search-container">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="search-input" placeholder="Rechercher..." oninput="updateSort()">
+                </div>
+                <div class="sort-container">
+                    <select id="sort-select" onchange="updateSort()">
+                        <option value="date-desc">📅 Récents</option>
+                        <option value="rarity-desc">💎 Rareté</option>
+                        <option value="hp-desc">❤️ PV</option>
+                        <option value="name-asc">🔤 Nom</option>
+                        <option value="gen-asc">🌍 Génération</option>
+                    </select>
+                    <span class="select-arrow">▼</span>
+                </div>
             </div>
 
-    </div>
+            <div id="admin-link-container" style="display: none; margin-top: 20px;">
+                <a href="admin.html" class="btn-admin" style="text-decoration: none; display:inline-block;">⚙️ ACCÉDER AU DASHBOARD ADMIN</a>
+            </div>
+        </div>
 
-    <div id="dl-toast" style="display: none;">
-        <div class="toast-header">
-            <span class="spinner-small"></span>
-            <strong id="toast-title">Téléchargement...</strong>
-        </div>
-        <div class="toast-body">
-            <span id="toast-msg">...</span>
-            <div class="progress-bg"><div id="toast-bar" style="width: 0%;"></div></div>
-        </div>
+        <div id="cards-grid" class="grid-container"></div>
     </div>
 
     <script type="module" src="script.js"></script>
     <script src="generator.js"></script>
-
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('✅ Système de cache activé !'))
-                    .catch(err => console.log('❌ Erreur cache:', err));
-            });
-        }
-    </script>
 </body>
 </html>
