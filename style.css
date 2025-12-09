@@ -1,0 +1,130 @@
+:root {
+    --card-width: 240px;
+    --primary: #3b4cca;
+    --secondary: #ffde00;
+    --dark: #232323;
+}
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: #1a1a1a;
+    background-image: radial-gradient(#333 1px, transparent 1px);
+    background-size: 20px 20px;
+    color: white;
+    margin: 0;
+    min-height: 100vh;
+}
+
+/* --- CONNEXION --- */
+#auth-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.9);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 1000;
+}
+.login-box {
+    background: white; color: #333; padding: 2rem; border-radius: 12px;
+    width: 320px; text-align: center;
+    box-shadow: 0 0 30px rgba(0,0,0,0.7);
+}
+.logo-img { width: 180px; margin-bottom: 20px; }
+.divider { margin: 15px 0; color: #888; font-size: 0.8em; font-weight: bold; }
+input { width: 100%; padding: 12px; margin: 6px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+.btn-group { display: flex; gap: 10px; margin-top: 15px; }
+button { cursor: pointer; border: none; padding: 10px; font-weight: bold; border-radius: 6px; transition: 0.2s; }
+.btn-google { background: white; border: 1px solid #ddd; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; color: #555; }
+.btn-primary { background: var(--primary); color: white; flex: 1; }
+.btn-secondary { background: #666; color: white; flex: 1; }
+
+/* --- INTERFACE JEU --- */
+nav {
+    background: var(--dark); border-bottom: 4px solid var(--secondary);
+    padding: 15px 30px; display: flex; justify-content: space-between; align-items: center;
+}
+.nav-logo { font-family: 'Roboto Condensed', sans-serif; font-size: 1.8rem; font-weight: bold; color: var(--secondary); text-shadow: 2px 2px 0 #3b4cca; }
+.player-stats { display: flex; gap: 15px; align-items: center; }
+.user-pill { background: #333; padding: 5px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+.btn-logout { background: #d32f2f; color: white; padding: 5px 15px; font-size: 0.8rem; }
+
+.action-area { text-align: center; padding: 40px; }
+.btn-booster {
+    background: linear-gradient(135deg, #ffde00 0%, #ffac00 100%);
+    border: 4px solid #3b4cca;
+    padding: 15px 50px; border-radius: 50px;
+    font-size: 1.2rem; color: #222;
+    box-shadow: 0 6px 0 #2a3693, 0 15px 20px rgba(0,0,0,0.4);
+    transition: transform 0.1s;
+}
+.btn-booster:active { transform: translateY(4px); box-shadow: 0 2px 0 #2a3693; }
+
+.admin-zone { margin-top: 30px; color: #666; font-size: 0.8rem; }
+.btn-admin { background: #444; color: #ccc; border: 1px dashed #666; margin-top: 10px; }
+
+/* --- LA CARTE TCG (Style Pro) --- */
+.grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--card-width), 1fr));
+    gap: 25px; padding: 20px; max-width: 1400px; margin: 0 auto;
+}
+
+.tcg-card {
+    background: #f4f4f4; color: #222;
+    border-radius: 14px;
+    aspect-ratio: 0.715; /* Standard Poker Card Ratio */
+    position: relative;
+    padding: 12px; box-sizing: border-box;
+    display: flex; flex-direction: column;
+    border: 10px solid #dec225; /* Bordure Jaune Classique */
+    box-shadow: -5px 5px 15px rgba(0,0,0,0.5);
+    transition: transform 0.3s;
+    font-size: 11px;
+}
+.tcg-card:hover { transform: scale(1.05) translateY(-5px); z-index: 10; box-shadow: 0 20px 30px rgba(0,0,0,0.5); }
+
+/* Header */
+.card-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px; }
+.card-name { font-weight: bold; font-size: 1.2em; font-family: 'Roboto Condensed', sans-serif; }
+.hp-group { display: flex; align-items: center; gap: 4px; color: #d00; font-weight: bold; font-size: 1.1em; }
+
+/* Image */
+.img-frame {
+    background: linear-gradient(135deg, #fff, #e0e0e0);
+    border: 3px solid #a0a0a0; 
+    box-shadow: inset 2px 2px 5px rgba(0,0,0,0.2), 2px 2px 4px rgba(0,0,0,0.3);
+    margin-bottom: 8px; height: 150px; /* Hauteur fixe image */
+    position: relative;
+}
+.card-img { width: 100%; height: 100%; object-fit: contain; }
+
+/* Attaques */
+.card-body { flex: 1; background: rgba(255,255,255,0.6); padding: 4px; border-radius: 4px; }
+.move-row { display: flex; align-items: center; margin-bottom: 6px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 4px; }
+.cost-icons { display: flex; gap: 1px; min-width: 45px; } /* Zone des énergies */
+.move-info { flex: 1; margin: 0 6px; }
+.move-name { font-weight: bold; font-size: 1em; }
+.move-dmg { font-weight: bold; font-size: 1.2em; }
+
+/* Footer */
+.card-footer {
+    display: flex; justify-content: space-between; margin-top: 6px; padding-top: 4px;
+    border-top: 2px solid #aaa; font-size: 0.8em; text-align: center; color: #444;
+}
+.stat-box { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+
+/* --- GESTION DES IMAGES SVG (Types) --- */
+.type-icon { width: 18px; height: 18px; vertical-align: middle; filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.2)); }
+.type-icon.big { width: 22px; height: 22px; } /* Header */
+.type-icon.small { width: 14px; height: 14px; opacity: 0.7; } /* Footer */
+
+/* Couleurs de fond dynamiques */
+.bg-Fire { background: #ffaeae; } .bg-Water { background: #aedeff; } .bg-Grass { background: #b0ffb0; }
+.bg-Electric { background: #fffdae; } .bg-Psychic { background: #f0b0ff; } .bg-Fighting { background: #e0b090; }
+.bg-Darkness { background: #777; color: white; } .bg-Metal { background: #ccc; } .bg-Fairy { background: #ffc0cb; }
+.bg-Dragon { background: #b0a0ff; } .bg-Normal { background: #e8e8e8; }
+
+/* Bordures Rareté */
+.tcg-card.commune { border-color: #dec225; }
+.tcg-card.peu-commune { border-color: #3bb143; }
+.tcg-card.rare { border-color: #3b4cca; }
+.tcg-card.ultra-rare { border-color: #ffd700; box-shadow: 0 0 15px #ffd700; }
+.tcg-card.secrete { border-color: #e040fb; box-shadow: 0 0 20px #e040fb; }
