@@ -414,29 +414,6 @@
     "rarity_tag": "common"
   },
   {
-    "id": 25,
-    "name": "Pikachu",
-    "hp": 70,
-    "types": [
-      "Electric"
-    ],
-    "image": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png",
-    "attacks": [
-      {
-        "name": "Attaque Rapide",
-        "cost": 1,
-        "damage": 10
-      },
-      {
-        "name": "Coup Spécial",
-        "cost": 3,
-        "damage": 56
-      }
-    ],
-    "weakness": "Standard",
-    "rarity_tag": "common"
-  },
-  {
     "id": 26,
     "name": "Raichu",
     "hp": 120,

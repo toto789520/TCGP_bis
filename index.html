@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Poké-TCG Online</title>
+    <title>Poké-TCG Ultimate</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
     
@@ -24,8 +24,8 @@
 
             <div class="divider">OU</div>
 
-            <input type="email" id="email" placeholder="Email" autocomplete="username">
-            <input type="password" id="password" placeholder="Mot de passe" autocomplete="current-password">
+            <input type="email" id="email" placeholder="Email" autocomplete="username" aria-label="Adresse Email">
+            <input type="password" id="password" placeholder="Mot de passe" autocomplete="current-password" aria-label="Mot de passe">
             
             <div class="btn-group">
                 <button onclick="signIn()" class="btn-secondary">Connexion</button>
@@ -38,43 +38,70 @@
     <div id="game-app" style="display:none;">
         
         <nav>
-            <div class="nav-logo">TCG <span class="version">v1.0</span></div>
+            <div class="nav-logo">TCG <span class="version">Ultimate</span></div>
             <div class="player-stats">
-                <span class="user-pill"><img src="https://cdn-icons-png.flaticon.com/512/1077/1077114.png" width="16"> <span id="user-display">Joueur</span></span>
-                <span class="user-pill"><img src="https://cdn-icons-png.flaticon.com/512/287/287221.png" width="16"> <span id="card-count">0</span> Cartes</span>
+                <span class="user-pill">👤 <span id="user-display">Joueur</span></span>
+                <span class="user-pill">🃏 <span id="card-count">0</span> Cartes</span>
                 <button onclick="logout()" class="btn-logout">Sortir</button>
             </div>
         </nav>
 
         <div class="action-area">
+            
+            <div class="custom-select-wrapper">
+                <label>SÉLECTION DU BOOSTER</label>
+                <div class="select-container">
+                    <select id="gen-select">
+                        <option value="gen1">Gen 1 - Kanto (151)</option>
+                        <option value="gen2">Gen 2 - Johto (100)</option>
+                        <option value="gen3">Gen 3 - Hoenn (135)</option>
+                        <option value="gen4">Gen 4 - Sinnoh (107)</option>
+                        <option value="gen5">Gen 5 - Unys (156)</option>
+                        <option value="gen6">Gen 6 - Kalos (72)</option>
+                        <option value="gen7">Gen 7 - Alola (88)</option>
+                    </select>
+                    <span class="select-arrow">▼</span>
+                </div>
+            </div>
+
             <button onclick="drawCard()" id="btn-draw" class="btn-booster">
                 <div class="booster-content">OUVRIR UN BOOSTER</div>
             </button>
             
-            <details class="admin-zone">
-                <summary>🛠️ Outils Admin (Génération)</summary>
-                <p>Télécharge toutes les générations (1 à 7) triées dans un fichier ZIP.</p>
+            <details class="admin-zone" id="admin-panel" style="display: none;">
+                <summary>🛠️ Admin & Générateur</summary>
+                <p>Télécharge les données JSON (Gen 1 à 7) pour le jeu.</p>
                 <button onclick="downloadAllGensZip()" class="btn-admin">💾 TÉLÉCHARGER TOUT (ZIP)</button>
             </details>
         </div>
 
-        <div id="cards-grid" class="grid-container"></div>
+        <div id="cards-grid" class="grid-container">
+            </div>
+
     </div>
 
     <div id="dl-toast" style="display: none;">
         <div class="toast-header">
             <span class="spinner-small"></span>
-            <strong id="toast-title">Téléchargement en cours...</strong>
+            <strong id="toast-title">Téléchargement...</strong>
         </div>
         <div class="toast-body">
-            <span id="toast-msg">Initialisation...</span>
-            <div class="progress-bg">
-                <div id="toast-bar" style="width: 0%;"></div>
-            </div>
+            <span id="toast-msg">...</span>
+            <div class="progress-bg"><div id="toast-bar" style="width: 0%;"></div></div>
         </div>
     </div>
 
     <script type="module" src="script.js"></script>
     <script src="generator.js"></script>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('✅ Système de cache activé !'))
+                    .catch(err => console.log('❌ Erreur cache:', err));
+            });
+        }
+    </script>
 </body>
 </html>

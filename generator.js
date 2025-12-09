@@ -1,74 +1,69 @@
-// Configuration
 const GENS = [
-    { id: "gen1", name: "Gen 1 (Kanto)", start: 1, end: 151, source: "fast" },
-    { id: "gen2", name: "Gen 2 (Johto)", start: 152, end: 251, source: "fast" },
-    { id: "gen3", name: "Gen 3 (Hoenn)", start: 252, end: 386, source: "fast" },
-    { id: "gen4", name: "Gen 4 (Sinnoh)", start: 387, end: 493, source: "fast" },
-    { id: "gen5", name: "Gen 5 (Unys)", start: 494, end: 649, source: "fast" },
-    { id: "gen6", name: "Gen 6 (Kalos)", start: 650, end: 721, source: "fast" },
-    { id: "gen7", name: "Gen 7 (Alola)", start: 722, end: 809, source: "fast" },
-    { id: "gen8", name: "Gen 8 (Galar)", start: 810, end: 905, source: "api" },
-    { id: "gen9", name: "Gen 9 (Paldea)", start: 906, end: 1025, source: "api" }
+    { id: "gen1", name: "Gen 1 (Kanto)", start: 1, end: 151 },
+    { id: "gen2", name: "Gen 2 (Johto)", start: 152, end: 251 },
+    { id: "gen3", name: "Gen 3 (Hoenn)", start: 252, end: 386 },
+    { id: "gen4", name: "Gen 4 (Sinnoh)", start: 387, end: 493 },
+    { id: "gen5", name: "Gen 5 (Unys)", start: 494, end: 649 },
+    { id: "gen6", name: "Gen 6 (Kalos)", start: 650, end: 721 },
+    { id: "gen7", name: "Gen 7 (Alola)", start: 722, end: 809 }
 ];
 
-const PROXY_URL = "https://corsproxy.io/?";
-const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const TYPE_TRANSLATION = {
+    "Fire": "Fire", "Water": "Water", "Grass": "Grass", "Electric": "Electric",
+    "Psychic": "Psychic", "Fighting": "Fighting", "Dark": "Darkness", "Steel": "Metal",
+    "Fairy": "Fairy", "Dragon": "Dragon", "Normal": "Normal", "Ground": "Ground",
+    "Flying": "Flying", "Bug": "Bug", "Rock": "Rock", "Ghost": "Ghost",
+    "Poison": "Poison", "Ice": "Ice"
+};
 
-// --- GESTION DU TOAST (Notification) ---
 const ui = {
     toast: document.getElementById('dl-toast'),
     title: document.getElementById('toast-title'),
     msg: document.getElementById('toast-msg'),
     bar: document.getElementById('toast-bar'),
-    
-    show: () => ui.toast.style.display = 'block',
-    hide: () => setTimeout(() => ui.toast.style.display = 'none', 5000), // Cache après 5s
+    show: () => { if(ui.toast) ui.toast.style.display = 'block'; },
+    hide: () => { if(ui.toast) setTimeout(() => ui.toast.style.display = 'none', 5000); },
     update: (title, message, percent) => {
-        ui.title.innerText = title;
-        ui.msg.innerText = message;
-        ui.bar.style.width = percent + "%";
+        if(ui.title) ui.title.innerText = title;
+        if(ui.msg) ui.msg.innerText = message;
+        if(ui.bar) ui.bar.style.width = percent + "%";
     }
 };
 
 window.downloadAllGensZip = async () => {
     console.clear();
     const btn = document.querySelector('.btn-admin');
-    if(btn) btn.disabled = true; // On désactive juste le bouton, pas l'écran
-    
+    if(btn) btn.disabled = true;
     ui.show();
-    ui.update("Démarrage...", "Préparation...", 0);
+    ui.update("Connexion", "Récupération données...", 10);
 
     try {
         const zip = new JSZip();
         const rootFolder = zip.folder("data");
 
-        // 1. GEN 1-7 (Rapide)
-        ui.update("Gen 1 à 7", "Téléchargement base GitHub...", 10);
-        const fastResponse = await fetch('https://raw.githubusercontent.com/fanzeyi/pokemon.json/master/pokedex.json');
-        if(!fastResponse.ok) throw new Error("Erreur GitHub");
-        const fastData = await fastResponse.json();
+        const response = await fetch('https://raw.githubusercontent.com/fanzeyi/pokemon.json/master/pokedex.json');
+        if (!response.ok) throw new Error("Erreur GitHub");
+        const rawData = await response.json();
 
-        // 2. BOUCLE PRINCIPALE
+        // Vérification des données
+        if(!rawData || rawData.length === 0) throw new Error("Données vides reçues !");
+
+        let totalCards = 0;
+
         for (let i = 0; i < GENS.length; i++) {
             const gen = GENS[i];
-            let processedCards = [];
+            const percent = 20 + Math.floor(((i + 1) / GENS.length) * 60);
+            ui.update(gen.name, `Génération des fichiers...`, percent);
+
+            const genData = rawData.filter(p => p.id >= gen.start && p.id <= gen.end);
             
-            // Calcul pourcentage global (basé sur le numéro de la gen)
-            const globalPercent = Math.floor(((i) / GENS.length) * 100);
+            if(genData.length > 0) {
+                const processedCards = genData.map(p => processPokemon(p));
+                totalCards += processedCards.length;
 
-            if (gen.source === "fast") {
-                ui.update(`Traitement ${gen.name}`, "Conversion rapide...", globalPercent);
-                const genData = fastData.filter(p => p.id >= gen.start && p.id <= gen.end);
-                processedCards = genData.map(p => processFastPokemon(p));
-            } 
-            else {
-                // Pour l'API lente, on passe le callback de mise à jour
-                processedCards = await fetchApiGenSequential(gen.start, gen.end, gen.name, globalPercent);
-            }
-
-            // Sauvegarde dans ZIP
-            if(processedCards.length > 0) {
                 const genFolder = rootFolder.folder(gen.id);
+                
+                // On s'assure d'écrire les fichiers même vides pour éviter les erreurs 404
                 saveJsonToZip(genFolder, processedCards, 'common', 'common.json');
                 saveJsonToZip(genFolder, processedCards, 'uncommon', 'uncommon.json');
                 saveJsonToZip(genFolder, processedCards, 'rare', 'rare.json');
@@ -77,94 +72,47 @@ window.downloadAllGensZip = async () => {
             }
         }
 
-        // 3. COMPRESSION
-        ui.update("Finalisation", "Création du fichier ZIP...", 100);
+        ui.update("Compression", "Création ZIP...", 90);
         const content = await zip.generateAsync({ type: "blob" });
-        saveAs(content, "tcg-full-collection.zip");
-        
-        ui.update("Terminé !", "Le téléchargement a démarré.", 100);
-        ui.hide(); // Se cache tout seul après 5 sec
+        saveAs(content, "tcg-fixed-data.zip");
+        ui.update("Terminé !", "Téléchargement lancé.", 100);
+        ui.hide();
 
     } catch (e) {
         console.error(e);
         ui.update("Erreur", e.message, 0);
-        ui.toast.style.borderLeft = "5px solid red";
+        alert("Erreur : " + e.message);
     } finally {
         if(btn) btn.disabled = false;
     }
 };
 
-// --- API SEQUENCE (Avec mise à jour UI) ---
-async function fetchApiGenSequential(startId, endId, genName, basePercent) {
-    const cards = [];
-    const total = endId - startId + 1;
-    let count = 0;
+function processPokemon(p) {
+    // CORRECTION MAJEURE ICI : Accès aux propriétés avec espaces
+    const stats = p.base;
+    const hp = stats["HP"] * 2; 
+    const atk = stats["Attack"];
+    const def = stats["Defense"];
+    const spatk = stats["Sp. Attack"]; // C'était ça le bug (le point et l'espace)
+    const spdef = stats["Sp. Defense"];
+    const spd = stats["Speed"];
 
-    for (let i = startId; i <= endId; i++) {
-        count++;
-        // Calcul pourcent fluide à l'intérieur de la génération
-        const currentGenProgress = (count / total) * (100 / GENS.length); 
-        const totalProgress = basePercent + currentGenProgress;
-        
-        ui.update(`DL ${genName}`, `${count}/${total} récupérés...`, totalProgress);
-        
-        try {
-            await wait(200); // Pause anti-ban
+    const typeEn = p.type[0]; // Anglais direct depuis le JSON
 
-            const pUrl = PROXY_URL + encodeURIComponent(`https://pokeapi.co/api/v2/pokemon/${i}`);
-            const pRes = await fetch(pUrl);
-            if(!pRes.ok) throw new Error("Err");
-            const pData = await pRes.json();
+    const attacks = [
+        { name: "Attaque Rapide", cost: 1, damage: 10 },
+        { name: "Coup Spécial", cost: 3, damage: Math.floor(atk / 1.5) + 20 }
+    ];
 
-            const sUrl = PROXY_URL + encodeURIComponent(`https://pokeapi.co/api/v2/pokemon-species/${i}`);
-            const sRes = await fetch(sUrl);
-            if(!sRes.ok) throw new Error("Err");
-            const sData = await sRes.json();
+    // Calcul du total des stats correctement
+    const totalStats = stats["HP"] + atk + def + spatk + spdef + spd;
+    let rarity = calculateRarity(p.id, totalStats);
 
-            // Logique de création de carte...
-            const nameFr = sData.names.find(n => n.language.name === 'fr')?.name || pData.name;
-            const typeCap = pData.types[0].type.name.charAt(0).toUpperCase() + pData.types[0].type.name.slice(1);
-            const totalStats = pData.stats.reduce((acc, s) => acc + s.base_stat, 0);
-
-            const attacks = [{ name: "Charge", cost: 1, damage: 10 }];
-            if (pData.moves.length > 0) {
-                const mName = pData.moves[Math.floor(Math.random() * Math.min(10, pData.moves.length))].move.name;
-                attacks.push({ name: mName, cost: 3, damage: Math.floor(pData.stats[1].base_stat / 1.5) + 20 });
-            }
-
-            let rarity = calculateRarity(i, totalStats);
-            if (sData.is_legendary || sData.is_mythical) rarity = "secret";
-
-            cards.push({
-                id: i,
-                name: nameFr,
-                hp: pData.stats[0].base_stat * 2,
-                types: [typeCap],
-                image: pData.sprites.other["official-artwork"].front_default,
-                attacks: attacks,
-                weakness: "Standard",
-                rarity_tag: rarity
-            });
-
-        } catch (e) {
-            // On ignore silencieusement les erreurs individuelles
-        }
-    }
-    return cards;
-}
-
-// --- UTILITAIRES ---
-function processFastPokemon(p) {
-    // ... (Garde la même logique qu'avant) ...
-    const hp = p.base.HP * 2;
-    const type = p.type[0]; 
-    const attacks = [{ name: "Attaque Rapide", cost: 1, damage: 10 }, { name: "Coup Spécial", cost: 3, damage: Math.floor(p.base.Attack / 1.5) + 20 }];
-    let rarity = calculateRarity(p.id, p.base.HP + p.base.Attack + p.base.Defense + p.base.Sp_Attack + p.base.Sp_Defense + p.base.Speed);
     return {
         id: p.id,
-        name: p.name.french || p.name.english,
+        name: (p.name.french) ? p.name.french : p.name.english,
         hp: hp,
-        types: [type],
+        types: [typeEn],
         image: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${p.id}.png`,
         attacks: attacks,
         weakness: "Standard",
@@ -174,12 +122,21 @@ function processFastPokemon(p) {
 
 function calculateRarity(id, totalStats) {
     let rarity = "common";
-    if (totalStats > 580) rarity = "secret"; 
-    else if (totalStats > 480) rarity = "ultra_rare";
-    else if (totalStats > 380) rarity = "rare";
-    else if (totalStats > 300) rarity = "uncommon";
-    if ([1,4,7, 152,155,158, 252,255,258, 387,390,393, 495,498,501, 650,653,656, 722,725,728, 810,813,816, 906,909,912].includes(id)) rarity = "uncommon";
-    if ([3,6,9, 154,157,160, 254,257,260, 389,392,395, 497,500,503, 652,655,658, 724,727,730, 812,815,818, 908,911,914].includes(id)) rarity = "ultra_rare";
+    
+    // Seuils ajustés pour être sûr d'avoir des rares
+    if (totalStats >= 580) rarity = "secret";        // Légendaires majeurs
+    else if (totalStats >= 500) rarity = "ultra_rare"; // Très forts / Starters finaux
+    else if (totalStats >= 400) rarity = "rare";       // Évolutions
+    else if (totalStats >= 300) rarity = "uncommon";   // Bases fortes
+
+    // Exceptions manuelles (Starters)
+    // Base (Bulbizarre...) -> Peu commune
+    if ([1,4,7, 152,155,158, 252,255,258, 387,390,393, 495,498,501, 650,653,656, 722,725,728].includes(id)) rarity = "uncommon";
+    // Finale (Florizarre...) -> Ultra Rare (Pour être sûr qu'ils ne soient pas justes "Rare")
+    if ([3,6,9, 154,157,160, 254,257,260, 389,392,395, 497,500,503, 652,655,658, 724,727,730].includes(id)) rarity = "ultra_rare";
+    // Légendaires iconiques -> Secret
+    if ([150, 151, 249, 250, 251, 382, 383, 384].includes(id)) rarity = "secret";
+
     return rarity;
 }
 
