@@ -1,66 +1,81 @@
 window.generateData = async () => {
     console.clear();
-    console.log("🚀 Lancement du générateur sans emojis...");
-    alert("Ouvre la console (F12) pour copier les résultats !");
+    console.log("🚀 Lancement du générateur FLASH (Source GitHub)...");
+    const btn = document.querySelector('.btn-admin');
+    if(btn) btn.innerText = "⏳ Téléchargement...";
 
-    const allCards = [];
-    const TOTAL = 151; 
+    try {
+        // 1. On récupère un "Pokedex" complet hébergé sur GitHub (C'est un seul gros fichier, donc pas de blocage !)
+        // Ce fichier contient les stats et les noms en plusieurs langues (dont FR)
+        const response = await fetch('https://raw.githubusercontent.com/fanzeyi/pokemon.json/master/pokedex.json');
+        const rawData = await response.json();
 
-    for (let i = 1; i <= TOTAL; i++) {
-        try {
-            const pRes = await fetch(`https://pokeapi.co/api/v2/pokemon/${i}`);
-            const pData = await pRes.json();
-            const sRes = await fetch(`https://pokeapi.co/api/v2/pokemon-species/${i}`);
-            const sData = await sRes.json();
+        // 2. On filtre pour garder juste la Gen 1 (ID 1 à 151)
+        // Pour avoir la Gen 2, remplace 151 par 251 ci-dessous !
+        const gen1 = rawData.slice(0, 151); 
 
-            // Type (Capitalized pour le mapping SVG)
-            let typeRaw = pData.types[0].type.name; 
-            const typeCap = typeRaw.charAt(0).toUpperCase() + typeRaw.slice(1);
-
-            // Simulation Attaques
-            const attacks = [];
-            attacks.push({ name: "Charge", cost: 1, damage: 10 });
-            if(pData.moves.length > 5) {
-                const randomMove = pData.moves[Math.floor(Math.random() * 10)].move.name;
-                attacks.push({ name: randomMove, cost: 3, damage: Math.floor(pData.stats[1].base_stat / 1.5) });
-            }
-
-            // Rareté
-            let rarity = "common";
-            if (sData.is_legendary || sData.is_mythical) rarity = "secret";
-            else if (pData.base_experience > 200) rarity = "ultra_rare";
-            else if (sData.evolves_from_species) rarity = "rare";
-            else if (pData.base_experience > 100) rarity = "uncommon";
+        const allCards = gen1.map(p => {
+            // Conversion des données pour notre format TCG
             
-            // Override Starters
-            if([1,4,7,25].includes(i)) rarity = "uncommon";
-            if([3,6,9].includes(i)) rarity = "ultra_rare";
+            // Stats : On prend les HP de base * 2
+            const hp = p.base.HP * 2;
+            
+            // Types : On garde le type en Anglais pour le CSS (ex: "Fire")
+            // Le fichier source a les types en anglais, c'est parfait.
+            const type = p.type[0]; 
 
-            allCards.push({
-                id: i,
-                name: sData.names.find(n => n.language.name === 'fr').name,
-                hp: pData.stats[0].base_stat * 2,
-                types: [typeCap], // Important pour les icones
-                image: pData.sprites.other["official-artwork"].front_default,
+            // Attaques (Simulation basée sur l'attaque du Pokémon)
+            const attacks = [
+                { name: "Charge", cost: 1, damage: 10 },
+                { name: "Attaque Spéciale", cost: 3, damage: Math.floor(p.base.Attack / 1.5) + 10 }
+            ];
+
+            // Rareté (Logique personnalisée)
+            let rarity = "common";
+            // Si c'est un légendaire (Mewtwo, Mew, oiseaux) ou très fort
+            if ([144,145,146,150,151].includes(p.id)) rarity = "secret";
+            // Starter évolutions finales et Dragons
+            else if ([3,6,9,149].includes(p.id) || p.base.HP > 90) rarity = "ultra_rare";
+            // Évolutions intermédiaires
+            else if (p.base.HP > 70) rarity = "rare";
+            // Starters de base
+            else if ([1,4,7,25].includes(p.id) || p.base.HP > 60) rarity = "uncommon";
+
+            return {
+                id: p.id,
+                name: p.name.french, // Nom en Français direct !
+                hp: hp,
+                types: [type], // ex: ["Fire"]
+                // On reconstruit l'URL de l'image officielle HD
+                image: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${p.id}.png`,
                 attacks: attacks,
                 weakness: "Standard",
                 rarity_tag: rarity
-            });
+            };
+        });
 
-            console.log(`✅ ${i}/${TOTAL} OK`);
+        // 3. Affichage des résultats pour copier-coller
+        console.log("✅ TERMINÉ EN MOINS D'UNE SECONDE !");
+        console.log("Copie les blocs ci-dessous dans tes fichiers JSON :");
 
-        } catch (e) { console.error(e); }
+        const show = (tag, filename) => {
+            const filtered = allCards.filter(c => c.rarity_tag === tag);
+            console.log(`\n⬇️ --- ${filename.toUpperCase()} (${filtered.length} cartes) --- ⬇️`);
+            console.log(JSON.stringify(filtered, null, 2));
+        };
+
+        show('common', 'data/common.json');
+        show('uncommon', 'data/uncommon.json');
+        show('rare', 'data/rare.json');
+        show('ultra_rare', 'data/ultra_rare.json');
+        show('secret', 'data/secret.json');
+
+        alert("Génération réussie ! Ouvre la console (F12) pour récupérer tes cartes.");
+
+    } catch (e) {
+        console.error("Erreur :", e);
+        alert("Erreur de téléchargement. Vérifie ta connexion.");
+    } finally {
+        if(btn) btn.innerText = "Lancer la génération";
     }
-
-    const show = (tag, file) => {
-        const filtered = allCards.filter(c => c.rarity_tag === tag);
-        console.log(`\n⬇️ COPIE CECI DANS ${file} ⬇️`);
-        console.log(JSON.stringify(filtered, null, 2));
-    };
-
-    show('common', 'data/common.json');
-    show('uncommon', 'data/uncommon.json');
-    show('rare', 'data/rare.json');
-    show('ultra_rare', 'data/ultra_rare.json');
-    show('secret', 'data/secret.json');
 };

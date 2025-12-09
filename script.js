@@ -32,12 +32,12 @@ const GAME_CONFIG = {
 
 // --- 2. CONFIG FIREBASE (REMPLACE PAR TA CONFIG) ---
 const firebaseConfig = {
-    apiKey: "AIzaSy...",
-    authDomain: "ton-projet.firebaseapp.com",
-    projectId: "ton-projet",
-    storageBucket: "ton-projet.appspot.com",
-    messagingSenderId: "...",
-    appId: "..."
+    apiKey: "AIzaSyBdtS508E3KBTZHfOTb7kl-XDc9vVn3oZI",
+    authDomain: "tcgp-27e34.firebaseapp.com",
+    projectId: "tcgp-27e34",
+    storageBucket: "tcgp-27e34.firebasestorage.app",
+    messagingSenderId: "7412987658",
+    appId: "1:7412987658:web:87f0a63b9b7c95548bacf3"
 };
 
 const app = initializeApp(firebaseConfig);
