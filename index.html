@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poké-TCG Online</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div id="auth-overlay">
+        <div class="login-box">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/9/98/International_Pok%C3%A9mon_logo.svg" alt="Logo" class="logo-img">
+            <h2>Espace Dresseur</h2>
+            
+            <button onclick="googleLogin()" class="btn-google">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" alt="G"> 
+                Connexion Google
+            </button>
+
+            <div class="divider">OU</div>
+
+            <input type="email" id="email" placeholder="Email">
+            <input type="password" id="password" placeholder="Mot de passe">
+            
+            <div class="btn-group">
+                <button onclick="signIn()" class="btn-secondary">Connexion</button>
+                <button onclick="signUp()" class="btn-primary">Créer compte</button>
+            </div>
+            <p id="auth-msg"></p>
+        </div>
+    </div>
+
+    <div id="game-app" style="display:none;">
+        
+        <nav>
+            <div class="nav-logo">TCG <span class="version">v1.0</span></div>
+            <div class="player-stats">
+                <span class="user-pill"><img src="https://cdn-icons-png.flaticon.com/512/1077/1077114.png" width="16"> <span id="user-display">Joueur</span></span>
+                <span class="user-pill"><img src="https://cdn-icons-png.flaticon.com/512/287/287221.png" width="16"> <span id="card-count">0</span> Cartes</span>
+                <button onclick="logout()" class="btn-logout">Sortir</button>
+            </div>
+        </nav>
+
+        <div class="action-area">
+            <button onclick="drawCard()" id="btn-draw" class="btn-booster">
+                <div class="booster-content">
+                    OUVRIR UN BOOSTER
+                </div>
+            </button>
+            
+            <details class="admin-zone">
+                <summary>🛠️ Outils Admin (Génération des JSONs)</summary>
+                <p>Clique sur le bouton ci-dessous, attends 30s et copie les résultats de la console (F12) dans tes fichiers JSON.</p>
+                <button onclick="generateData()" class="btn-admin">Lancer la génération</button>
+            </details>
+        </div>
+
+        <div id="cards-grid" class="grid-container">
+            </div>
+
+    </div>
+
+    <script type="module" src="script.js"></script>
+    <script src="generator.js"></script>
+</body>
+</html>
