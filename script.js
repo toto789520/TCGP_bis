@@ -52,6 +52,7 @@ const GAME_CONFIG = {
 
 // --- VARIABLES GLOBALES (C'est ici qu'il manquait currentGenData !) ---
 let userCardsCache = []; 
+let userCollection = [];
 let currentGenData = []; // <--- CELLE-CI ÉTAIT MANQUANTE
 let cooldownInterval = null;
 let currentUserRole = 'player'; 
