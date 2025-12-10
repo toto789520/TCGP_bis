@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+     viewBox="0 0 255.1 255.1" style="enable-background:new 0 0 255.1 255.1;" xml:space="preserve">
+<style type="text/css">
+    .st0{fill:#F08030;} /* Couleur Feu */
+    .st1{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+</style>
+<circle class="st0" cx="127.6" cy="127.6" r="121.6"/>
+<path class="st1" d="M127.5,58.6c0,0-58.5,65.2-58.5,113.8c0,32.3,26.2,58.5,58.5,58.5s58.5-26.2,58.5-58.5
+    C186,123.8,127.5,58.6,127.5,58.6z M127.5,108.6c0,0-29.2,39.1-29.2,68.3c0,16.1,13.1,29.2,29.2,29.2s29.2-13.1,29.2-29.2
+    C156.7,147.7,127.5,108.6,127.5,108.6z"/>
+</svg>

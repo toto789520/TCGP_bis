@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+     viewBox="0 0 255.1 255.1" style="enable-background:new 0 0 255.1 255.1;" xml:space="preserve">
+<style type="text/css">
+    .st0{fill:#A890F0;} /* Couleur Vol */
+    .st1{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+</style>
+<circle class="st0" cx="127.6" cy="127.6" r="121.6"/>
+<path class="st1" d="M127.6,67.6l17.6,54.2h57l-46.1,33.5l17.6,54.2l-46.1-33.5l-46.1,33.5l17.6-54.2l-46.1-33.5h57L127.6,67.6z"/>
+</svg>

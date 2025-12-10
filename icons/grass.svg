@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+     viewBox="0 0 255.1 255.1" style="enable-background:new 0 0 255.1 255.1;" xml:space="preserve">
+<style type="text/css">
+    .st0{fill:#78C850;} /* Couleur Plante */
+    .st1{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+</style>
+<circle class="st0" cx="127.6" cy="127.6" r="121.6"/>
+<path class="st1" d="M127.6,73.6c0,0-36,36-36,72c0,19.9,16.1,36,36,36s36-16.1,36-36C163.6,109.6,127.6,73.6,127.6,73.6z
+    M91.6,145.6c0-19.9-16.1-36-36-36c0,0,36,36,36,72C91.6,181.6,91.6,145.6,91.6,145.6z
+    M163.6,145.6c0-19.9,16.1-36,36-36c0,0-36,36-36,72C163.6,181.6,163.6,145.6,163.6,145.6z"/>
+</svg>

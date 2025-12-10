@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+     viewBox="0 0 255.1 255.1" style="enable-background:new 0 0 255.1 255.1;" xml:space="preserve">
+<style type="text/css">
+    .st0{fill:#705898;} /* Couleur Spectre */
+    .st1{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+</style>
+<circle class="st0" cx="127.6" cy="127.6" r="121.6"/>
+<path class="st1" d="M127.6,83.6c-24.3,0-44,19.7-44,44s19.7,44,44,44s44-19.7,44-44S151.9,83.6,127.6,83.6z
+    M127.6,161.6c-18.8,0-34-15.2-34-34s15.2-34,34-34s34,15.2,34,34S146.4,161.6,127.6,161.6z"/>
+</svg>

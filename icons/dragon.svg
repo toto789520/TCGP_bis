@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+     viewBox="0 0 255.1 255.1" style="enable-background:new 0 0 255.1 255.1;" xml:space="preserve">
+<style type="text/css">
+    .st0{fill:#C4A64B;} /* Couleur Dragon TCG (Or) */
+    .st1{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+</style>
+<circle class="st0" cx="127.6" cy="127.6" r="121.6"/>
+<path class="st1" d="M80,80h95v40H80V80z M100,110v80h60v-80H100z M120,70v20h20V70H120z"/>
+</svg>
