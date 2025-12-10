@@ -280,7 +280,7 @@ window.filterBinder = () => {
     renderBinder();
 };
 
-// Création du HTML d'une carte
+// Création du HTML d'une carte (Compatible Pokémon & Events)
 function createCardElement(card, quantity = 1) {
     const div = document.createElement('div');
     const mainType = card.types ? card.types[0] : 'Normal';
@@ -299,11 +299,11 @@ function createCardElement(card, quantity = 1) {
 
     let bodyContent = '';
     
-    // Si la carte a une description au lieu d'attaques (cartes événements)
+    // NOUVEAU : Si la carte a une description (Carte Événement)
     if(card.description) {
         bodyContent = `<div class="card-description">${card.description}</div>`;
     } else if(card.attacks && card.attacks.length > 0) {
-        // Attaques normales
+        // Attaques normales de Pokémon
         card.attacks.forEach(a => {
             const costHtml = Array(a.cost).fill(`<img src="${icon}" class="type-icon small">`).join('');
             bodyContent += `
@@ -318,7 +318,8 @@ function createCardElement(card, quantity = 1) {
     // Afficher les HP seulement si > 0
     const hpDisplay = card.hp > 0 ? `${card.hp} PV <img src="${icon}" class="type-icon big">` : '';
     
-    // Si c'est une carte événement (avec description), ne pas afficher le footer
+    // Si c'est une carte événement (avec description), on peut masquer le footer ou le garder pour le style
+    // Ici je le garde mais tu peux l'enlever avec une condition
     const hasFooter = !card.description;
 
     div.innerHTML = `
@@ -362,16 +363,16 @@ window.drawCard = async () => {
 
     try {
         tempBoosterCards = [];
-        // 50% de chance d'avoir 5 ou 6 cartes
-        const packSize = Math.random() < 0.5 ? 5 : 6;
+        // 50% de chance d'avoir 4 ou 5 cartes
+        const packSize = Math.random() < 0.5 ? 4 : 5;
 
         for(let i=0; i<packSize; i++) {
             const rand = Math.random() * 100;
             let rarityConfig = GAME_CONFIG.dropRates[0];
             let acc = 0;
             
-            // La 6ème carte (index 5) utilise des taux spéciaux
-            const rates = (i === 5) ? GAME_CONFIG.dropRatesSixthCard : GAME_CONFIG.dropRates;
+            // La 5ème carte (index 4) utilise des taux spéciaux
+            const rates = (i === 4) ? GAME_CONFIG.dropRatesSixthCard : GAME_CONFIG.dropRates;
             
             for (const r of rates) {
                 acc += r.chance;
@@ -395,8 +396,20 @@ window.drawCard = async () => {
                 }
             }
 
-            // Pioche
-            const card = list[Math.floor(Math.random() * list.length)];
+            // Pioche avec limitation à 2 cartes identiques max
+            let card;
+            let attempts = 0;
+            const maxAttempts = 50;
+            
+            do {
+                card = list[Math.floor(Math.random() * list.length)];
+                const sameCardCount = tempBoosterCards.filter(c => c.id === card.id).length;
+                
+                // Si on a déjà 2 fois cette carte, on en cherche une autre
+                if (sameCardCount < 2) break;
+                
+                attempts++;
+            } while (attempts < maxAttempts);
             
             // Construction de l'objet sauvegardé
             card.acquiredAt = Date.now();
