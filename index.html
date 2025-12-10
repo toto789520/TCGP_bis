@@ -2,14 +2,10 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Poké-TCG Ultimate</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"> <title>Poké-TCG Ultimate</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
-
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 </head>
@@ -20,6 +16,13 @@
         <h2>Chargement du Monde...</h2>
     </div>
 
+    <div id="booster-overlay" style="display:none;">
+        <h2 class="opening-title">CLIQUEZ POUR RÉVÉLER !</h2>
+        <div id="booster-cards-container">
+            </div>
+        <button id="close-booster-btn" onclick="closeBooster()" style="display:none;">AJOUTER À LA COLLECTION</button>
+    </div>
+
     <div id="auth-overlay" style="display:none;">
         <div class="login-box">
             <img src="https://upload.wikimedia.org/wikipedia/commons/9/98/International_Pok%C3%A9mon_logo.svg" alt="Logo" class="logo-img">
@@ -28,19 +31,22 @@
                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18"> Connexion Google
             </button>
             <div class="divider">OU</div>
-            <input type="email" id="email" placeholder="Email" autocomplete="username">
-            <input type="password" id="password" placeholder="Mot de passe" autocomplete="current-password">
-            <div class="btn-group">
-                <button onclick="signIn()" class="btn-secondary">Connexion</button>
-                <button onclick="signUp()" class="btn-primary">Créer compte</button>
-            </div>
+            
+            <form onsubmit="event.preventDefault(); signIn();">
+                <input type="email" id="email" placeholder="Email" autocomplete="username" aria-label="Email">
+                <input type="password" id="password" placeholder="Mot de passe" autocomplete="current-password" aria-label="Mot de passe">
+                <div class="btn-group">
+                    <button type="submit" class="btn-secondary">Connexion</button>
+                    <button type="button" onclick="signUp()" class="btn-primary">Créer compte</button>
+                </div>
+            </form>
             <p id="auth-msg"></p>
         </div>
     </div>
 
     <div id="game-app" style="display:none;">
         <nav>
-            <div class="nav-logo">TCG <span class="version">Ultimate</span></div>
+            <div class="nav-logo">TCG <span class="version">Binder</span></div>
             <div class="player-stats">
                 <span id="notif-bell" class="notification-bell" onclick="requestNotification()">🔔</span>
                 <span class="user-pill">👤 <span id="user-display">...</span></span>
@@ -50,19 +56,10 @@
         </nav>
 
         <div class="action-area">
-            
             <div class="custom-select-wrapper">
-                <label>SÉLECTION DU BOOSTER</label>
+                <label>CHOIX DU CLASSEUR</label>
                 <div class="select-container">
-                    <select id="gen-select">
-                        <option value="gen1">Gen 1 - Kanto (151)</option>
-                        <option value="gen2">Gen 2 - Johto (100)</option>
-                        <option value="gen3">Gen 3 - Hoenn (135)</option>
-                        <option value="gen4">Gen 4 - Sinnoh (107)</option>
-                        <option value="gen5">Gen 5 - Unys (156)</option>
-                        <option value="gen6">Gen 6 - Kalos (72)</option>
-                        <option value="gen7">Gen 7 - Alola (88)</option>
-                    </select>
+                    <select id="gen-select" onchange="changeGen()"></select>
                     <span class="select-arrow">▼</span>
                 </div>
             </div>
@@ -74,30 +71,20 @@
             <div id="cooldown-display" style="display:none;">
                 ⏳ Prochain dans : <span id="timer-val">00:00</span>
             </div>
-            
+
             <div class="toolbar">
                 <div class="search-container">
                     <span class="search-icon">🔍</span>
-                    <input type="text" id="search-input" placeholder="Rechercher une carte..." oninput="updateSort()">
+                    <input type="text" id="search-input" placeholder="Filtrer..." oninput="filterBinder()" aria-label="Rechercher une carte">
                 </div>
-                <div class="sort-container">
-                    <select id="sort-select" onchange="updateSort()">
-                        <option value="date-desc">📅 Récents</option>
-                        <option value="rarity-desc">💎 Rareté</option>
-                        <option value="hp-desc">❤️ PV</option>
-                        <option value="name-asc">🔤 Nom</option>
-                        <option value="gen-asc">🌍 Génération</option>
-                    </select>
-                    <span class="sort-arrow">▼</span>
                 </div>
-            </div>
 
             <div id="admin-link-container" style="display: none; margin-top: 20px;">
-                <a href="admin.html" class="btn-admin-link">⚙️ ACCÉDER AU DASHBOARD ADMIN</a>
+                <a href="admin.html" class="btn-admin-link">⚙️ ADMIN</a>
             </div>
         </div>
 
-        <div id="cards-grid" class="grid-container"></div>
+        <div id="cards-grid" class="grid-container binder-mode"></div>
     </div>
 
     <div id="custom-popup-overlay" style="display: none;">
