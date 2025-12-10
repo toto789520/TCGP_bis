@@ -322,7 +322,7 @@ function createCardElement(card, quantity = 1) {
     const hasFooter = !card.description;
 
     div.innerHTML = `
-        ${label && card.rarityKey !== 'common' ? `<div class="rarity-badge badge-${cssRarity}">${label}</div>` : ''}
+        ${label ? `<div class="rarity-badge badge-${cssRarity}">${label}</div>` : ''}
         <div class="card-header">
             <span class="card-name">${card.name}</span>
             <div class="hp-group">${hpDisplay}</div>
