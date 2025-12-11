@@ -211,6 +211,14 @@ onAuthStateChanged(auth, async (user) => {
             openBoosterVisual(revealedCards);
         }
         
+        // Vérifier les notifications admin
+        if (snap.exists() && snap.data().adminNotification) {
+            const notif = snap.data().adminNotification;
+            window.showPopup("Notification Admin", notif.message);
+            // Supprimer la notification après affichage
+            await updateDoc(doc(db, "players", user.uid), { adminNotification: null });
+        }
+        
         // 3. Charger le classeur (Gen par défaut)
         await changeGen(); 
 

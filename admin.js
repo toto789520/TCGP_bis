@@ -87,7 +87,20 @@ window.toggleRole = async (uid, currentRole) => {
 };
 
 window.resetCooldown = async (uid, email) => {
-    try { await updateDoc(doc(db, "players", uid), { lastDrawTime: 0 }); window.showPopup("Succès", `Timer reset pour ${email}`); loadAllPlayers(); } catch (e) { window.showPopup("Erreur", e.message); }
+    try { 
+        await updateDoc(doc(db, "players", uid), { 
+            lastDrawTime: 0,
+            adminNotification: {
+                type: 'cooldown_reset',
+                message: '⚡ Votre cooldown a été réinitialisé par un administrateur !',
+                timestamp: Date.now()
+            }
+        }); 
+        window.showPopup("Succès", `Timer reset pour ${email}`); 
+        loadAllPlayers(); 
+    } catch (e) { 
+        window.showPopup("Erreur", e.message); 
+    }
 };
 
 window.resetPlayer = async (uid, email) => {
