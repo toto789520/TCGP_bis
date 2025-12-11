@@ -136,7 +136,7 @@ self.addEventListener('notificationclick', event => {
         }
         // Sinon, ouvrir une nouvelle fenêtre
         if (clients.openWindow) {
-          const urlToOpen = event.notification.data?.url || '/';
+          const urlToOpen = event.notification.data?.url || self.registration.scope;
           return clients.openWindow(urlToOpen);
         }
       })

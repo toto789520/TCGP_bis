@@ -1356,8 +1356,12 @@ function startTimer(durationMs, uid = null) {
         remaining -= 1000;
         if (remaining <= 0) {
             clearInterval(cooldownInterval);
-            // Send notification when packs are ready
-            sendPacksReadyNotification();
+            // Send notification when packs are ready (with error handling)
+            try {
+                sendPacksReadyNotification();
+            } catch (error) {
+                Logger.error('Erreur lors de l\'envoi de la notification de packs prêts', error);
+            }
             // Re-vérifier les packs disponibles
             if (uid) checkCooldown(uid);
             else enableBoosterButton(true);
@@ -1384,6 +1388,10 @@ function enableBoosterButton(enabled) {
 }
 
 // --- NOTIFICATIONS ---
+const NOTIFICATION_PACKS_READY_TITLE = "Poké-TCG - Packs disponibles ! 🎉";
+const NOTIFICATION_PACKS_READY_BODY = "Intéressant ! Vos packs sont maintenant disponibles. Revenez vite pour les ouvrir !";
+const NOTIFICATION_PACKS_READY_BODY_SHORT = "Intéressant ! Vos packs sont maintenant disponibles.";
+
 function sendPacksReadyNotification() {
     // Only send notification if permission is granted
     if (Notification.permission !== "granted") {
@@ -1394,8 +1402,8 @@ function sendPacksReadyNotification() {
     try {
         if (swRegistration) {
             // Use service worker notification for better mobile support
-            swRegistration.showNotification("Poké-TCG - Packs disponibles ! 🎉", {
-                body: "Intéressant ! Vos packs sont maintenant disponibles. Revenez vite pour les ouvrir !",
+            swRegistration.showNotification(NOTIFICATION_PACKS_READY_TITLE, {
+                body: NOTIFICATION_PACKS_READY_BODY,
                 icon: "favicon.ico",
                 badge: "favicon.ico",
                 tag: "packs-ready",
@@ -1409,8 +1417,8 @@ function sendPacksReadyNotification() {
             Logger.info('Notification envoyée: packs disponibles');
         } else if ('Notification' in window) {
             // Fallback to basic notification
-            const notification = new Notification("Poké-TCG - Packs disponibles ! 🎉", {
-                body: "Intéressant ! Vos packs sont maintenant disponibles.",
+            const notification = new Notification(NOTIFICATION_PACKS_READY_TITLE, {
+                body: NOTIFICATION_PACKS_READY_BODY_SHORT,
                 icon: "favicon.ico"
             });
             
@@ -1442,9 +1450,13 @@ window.requestNotification = async () => {
             // Save notification preference to user profile
             const user = auth.currentUser;
             if (user) {
-                await setDoc(doc(db, "players", user.uid), {
-                    notificationsEnabled: true
-                }, { merge: true });
+                try {
+                    await setDoc(doc(db, "players", user.uid), {
+                        notificationsEnabled: true
+                    }, { merge: true });
+                } catch (error) {
+                    Logger.error('Erreur lors de la sauvegarde de la préférence de notification', error);
+                }
             }
             
             // Show test notification using Service Worker
