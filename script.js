@@ -192,7 +192,7 @@ window.showDropRates = () => {
     const packInfo = `
 <strong>🎁 SYSTÈME DE PACKS :</strong>
 • Vous disposez de 3 packs maximum
-• 1 pack se régénère toutes les ${COOLDOWN_MINUTES} minutes
+• Les 3 packs se régénèrent toutes les ${COOLDOWN_MINUTES} minutes
 • Vous pouvez ouvrir un pack dès qu'il est disponible
 
 <strong>🎲 TAILLE DU PACK :</strong>
@@ -791,16 +791,22 @@ window.closeBooster = async () => {
         } catch (e) {
             console.error("Erreur nettoyage booster:", e);
         }
+        
+        // Vérifier s'il reste des packs disponibles
+        const isAdmin = (user.email === ADMIN_EMAIL);
+        
+        if (isAdmin) {
+            // Admin peut toujours ouvrir
+            btn.disabled = false;
+            btn.innerHTML = '<div class="booster-content">OUVRIR UN BOOSTER</div>';
+        } else {
+            // Vérifier les packs disponibles pour les joueurs normaux
+            await checkCooldown(user.uid);
+        }
     }
     
     // Réinitialiser les cartes temporaires
     tempBoosterCards = [];
-    
-    // Si admin, on réactive le bouton tout de suite
-    if (auth.currentUser && auth.currentUser.email === ADMIN_EMAIL) {
-        btn.disabled = false;
-        btn.innerHTML = '<div class="booster-content">OUVRIR UN BOOSTER</div>';
-    }
     
     // Recharger le binder pour montrer les nouvelles cartes
     renderBinder();
@@ -816,15 +822,13 @@ async function checkCooldown(uid) {
         const diff = Date.now() - lastDraw;
         const cooldownMs = COOLDOWN_MINUTES * 60 * 1000;
         
-        // Calculer combien de packs ont été régénérés depuis le dernier draw
-        const packsRegenerated = Math.floor(diff / cooldownMs);
-        availablePacks = Math.min(availablePacks + packsRegenerated, PACKS_PER_COOLDOWN);
-        
-        // Mettre à jour Firebase avec le nouveau compte de packs
-        if (packsRegenerated > 0) {
+        // Si le cooldown est passé, régénérer TOUS les packs
+        if (diff >= cooldownMs) {
+            availablePacks = PACKS_PER_COOLDOWN;
+            
+            // Mettre à jour Firebase
             await updateDoc(doc(db, "players", uid), { 
-                availablePacks,
-                lastDrawTime: lastDraw + (packsRegenerated * cooldownMs)
+                availablePacks: PACKS_PER_COOLDOWN
             });
         }
         
@@ -834,8 +838,8 @@ async function checkCooldown(uid) {
         if (availablePacks > 0) {
             enableBoosterButton(true);
         } else {
-            // Calculer le temps restant avant le prochain pack
-            const timeToNextPack = cooldownMs - (diff % cooldownMs);
+            // Calculer le temps restant avant la régénération complète
+            const timeToNextPack = cooldownMs - diff;
             startTimer(timeToNextPack, uid);
         }
     } else {
@@ -849,7 +853,8 @@ function updatePacksDisplay(count) {
     const packsCount = document.getElementById('packs-count');
     if (packsDisplay && packsCount) {
         packsCount.innerText = count;
-        packsDisplay.style.display = 'block';
+        // Cacher le compteur si 0 packs disponibles
+        packsDisplay.style.display = count > 0 ? 'block' : 'none';
     }
 }
 

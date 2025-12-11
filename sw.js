@@ -39,9 +39,26 @@ self.addEventListener('activate', event => {
 
 // Stratégie de cache: Network First, puis Cache
 self.addEventListener('fetch', event => {
+  // Ignorer les requêtes POST et autres méthodes non-GET
+  if (event.request.method !== 'GET') {
+    return;
+  }
+  
+  // Ignorer les requêtes Firebase
+  if (event.request.url.includes('firebasestorage') || 
+      event.request.url.includes('firebaseapp') ||
+      event.request.url.includes('googleapis')) {
+    return;
+  }
+  
   event.respondWith(
     fetch(event.request)
       .then(response => {
+        // Ne cacher que les réponses réussies
+        if (!response || response.status !== 200 || response.type !== 'basic') {
+          return response;
+        }
+        
         // Cloner la réponse
         const responseToCache = response.clone();
         

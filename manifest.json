@@ -13,84 +13,21 @@
   "categories": ["games", "entertainment"],
   "icons": [
     {
-      "src": "icons/icon-72x72.png",
-      "sizes": "72x72",
-      "type": "image/png",
-      "purpose": "any"
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
     },
     {
-      "src": "icons/icon-96x96.png",
-      "sizes": "96x96",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/icon-128x128.png",
-      "sizes": "128x128",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/icon-144x144.png",
-      "sizes": "144x144",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/icon-152x152.png",
-      "sizes": "152x152",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/icon-192x192.png",
+      "src": "favicon.ico",
       "sizes": "192x192",
-      "type": "image/png",
+      "type": "image/x-icon",
       "purpose": "any maskable"
     },
     {
-      "src": "icons/icon-384x384.png",
-      "sizes": "384x384",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/icon-512x512.png",
+      "src": "favicon.ico",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/x-icon",
       "purpose": "any maskable"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "screenshots/screenshot-1.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "platform": "wide",
-      "label": "Classeur de cartes Pokémon"
-    },
-    {
-      "src": "screenshots/screenshot-2.png",
-      "sizes": "750x1334",
-      "type": "image/png",
-      "platform": "narrow",
-      "label": "Ouverture de booster"
-    }
-  ],
-  "shortcuts": [
-    {
-      "name": "Ouvrir un booster",
-      "short_name": "Booster",
-      "description": "Ouvrir un nouveau booster de cartes",
-      "url": "/?action=open-booster",
-      "icons": [{ "src": "icons/shortcut-booster.png", "sizes": "96x96" }]
-    },
-    {
-      "name": "Mon classeur",
-      "short_name": "Classeur",
-      "description": "Voir ma collection de cartes",
-      "url": "/?action=view-collection",
-      "icons": [{ "src": "icons/shortcut-collection.png", "sizes": "96x96" }]
     }
   ],
   "related_applications": [],
