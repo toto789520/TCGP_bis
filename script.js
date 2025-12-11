@@ -3,6 +3,8 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChang
 import { getFirestore, doc, setDoc, updateDoc, arrayUnion, getDoc, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // --- ENREGISTREMENT SERVICE WORKER (PWA) ---
+let deferredPrompt = null;
+
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
@@ -14,6 +16,44 @@ if ('serviceWorker' in navigator) {
             });
     });
 }
+
+// Capture l'événement d'installation PWA
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    // Afficher le bouton d'installation
+    const installBtn = document.getElementById('install-pwa-btn');
+    if (installBtn) {
+        installBtn.style.display = 'inline-block';
+    }
+});
+
+// Fonction d'installation PWA
+window.installPWA = async function() {
+    if (!deferredPrompt) return;
+    
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+        console.log('PWA installée');
+    }
+    
+    deferredPrompt = null;
+    const installBtn = document.getElementById('install-pwa-btn');
+    if (installBtn) {
+        installBtn.style.display = 'none';
+    }
+};
+
+// Cacher le bouton si déjà installé
+window.addEventListener('appinstalled', () => {
+    const installBtn = document.getElementById('install-pwa-btn');
+    if (installBtn) {
+        installBtn.style.display = 'none';
+    }
+    deferredPrompt = null;
+});
 
 // --- 1. CONFIGURATION ---
 const ADMIN_EMAIL = "bryan.drouet24@gmail.com"; 
@@ -36,7 +76,7 @@ const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
 // --- GESTION INSTANCE UNIQUE ---
-const SESSION_ID = Date.now() + '_' + Math.random().toString(36);
+const SESSION_ID = Date.now() + '_' + Math.random().toString(36) + '_' + performance.now();
 let sessionCheckInterval = null;
 let isBlocked = false;
 
@@ -51,8 +91,8 @@ async function checkSingleInstance(userId) {
             const data = sessionDoc.data();
             const now = Date.now();
             
-            // Si la session existe et est active (moins de 10 secondes)
-            if (data.sessionId !== SESSION_ID && (now - data.lastPing) < 10000) {
+            // Si la session existe et est active (moins de 5 secondes pour éviter les faux positifs)
+            if (data.sessionId !== SESSION_ID && (now - data.lastPing) < 5000) {
                 isBlocked = true;
                 clearInterval(sessionCheckInterval);
                 document.body.innerHTML = `
@@ -190,28 +230,28 @@ window.closePopup = () => {
 // --- AFFICHAGE DES PROBABILITÉS ---
 window.showDropRates = () => {
     const packInfo = `
-<strong>🎁 SYSTÈME DE PACKS :</strong>
+<h3>🎁 SYSTÈME DE PACKS :</h3>
 • Vous disposez de 3 packs maximum
 • Les 3 packs se régénèrent toutes les ${COOLDOWN_MINUTES} minutes
 • Vous pouvez ouvrir un pack dès qu'il est disponible
 
-<strong>🎲 TAILLE DU PACK :</strong>
+<h3>🎲 TAILLE DU PACK :</h3>
 • 50% de chance d'obtenir 4 cartes
 • 50% de chance d'obtenir 5 cartes
 
-<strong>📊 PROBABILITÉS DE RARETÉ (Cartes 1-4) :</strong>
+<h3>📊 PROBABILITÉS DE RARETÉ (Cartes 1-4) :</h3>
 • ⚪ Commune : 56%
 • 🟢 Peu Commune : 26%
 • 🔵 Rare : 14%
 • 🟣 Ultra Rare : 3.8%
 • ⭐ Secrète : 0.2%
 
-<strong>✨ 5ème CARTE (si pack de 5) :</strong>
+<h3>✨ 5ème CARTE (si pack de 5) :</h3>
 • 🔵 Rare : 70%
 • 🟣 Ultra Rare : 30%
 (Pas de commune, peu commune ou secrète)
 
-<strong>🚫 LIMITE :</strong>
+<h3>🚫 LIMITE :</h3>
 Maximum 2 cartes identiques par pack
     `.trim();
     
@@ -823,6 +863,7 @@ async function checkCooldown(uid) {
         const cooldownMs = COOLDOWN_MINUTES * 60 * 1000;
         
         // Si le cooldown est passé, régénérer TOUS les packs
+        const wasZero = availablePacks === 0;
         if (diff >= cooldownMs) {
             availablePacks = PACKS_PER_COOLDOWN;
             
@@ -832,8 +873,8 @@ async function checkCooldown(uid) {
             });
         }
         
-        // Afficher le nombre de packs disponibles
-        updatePacksDisplay(availablePacks);
+        // Afficher le nombre de packs disponibles avec animation si régénération
+        updatePacksDisplay(availablePacks, wasZero && availablePacks === PACKS_PER_COOLDOWN);
         
         if (availablePacks > 0) {
             enableBoosterButton(true);
@@ -848,13 +889,22 @@ async function checkCooldown(uid) {
     }
 }
 
-function updatePacksDisplay(count) {
+function updatePacksDisplay(count, animate = false) {
     const packsDisplay = document.getElementById('packs-available');
     const packsCount = document.getElementById('packs-count');
     if (packsDisplay && packsCount) {
+        const wasHidden = packsDisplay.style.display === 'none';
         packsCount.innerText = count;
         // Cacher le compteur si 0 packs disponibles
         packsDisplay.style.display = count > 0 ? 'block' : 'none';
+        
+        // Animation quand les packs reviennent disponibles
+        if (animate && count === PACKS_PER_COOLDOWN && wasHidden) {
+            packsDisplay.classList.remove('packs-ready-animation');
+            void packsDisplay.offsetWidth; // Force reflow
+            packsDisplay.classList.add('packs-ready-animation');
+            setTimeout(() => packsDisplay.classList.remove('packs-ready-animation'), 2000);
+        }
     }
 }
 

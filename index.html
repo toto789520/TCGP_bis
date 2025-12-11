@@ -84,6 +84,7 @@
         <nav>
             <div class="nav-logo">TCG <span class="version">Binder</span></div>
             <div class="player-stats">
+                <button id="install-pwa-btn" class="btn-install-pwa" onclick="installPWA()" style="display: none;" title="Installer l'application">📱 Installer</button>
                 <span id="notif-bell" class="notification-bell" onclick="requestNotification()" title="Activer les notifications">🔔</span>
                 <span class="user-pill" id="user-profile-pill" style="cursor: pointer;">👤 <span id="user-display">...</span></span>
                 <span class="user-pill">🃏 <span id="card-count">0</span></span>
@@ -105,7 +106,7 @@
                 <div class="booster-content">CHARGEMENT...</div>
             </button>
             
-            <div id="packs-available" style="display:none; margin: 10px 0; font-weight: bold; color: var(--secondary); font-size: 1.1rem;">
+            <div id="packs-available" class="packs-display" style="display:none; margin: 10px 0; font-weight: bold; color: var(--secondary); font-size: 1.1rem;">
                 🎁 Packs disponibles : <span id="packs-count">0</span>/3
             </div>
             

@@ -63,6 +63,26 @@ nav { background: var(--dark); border-bottom: 4px solid var(--secondary); paddin
 .player-stats { display: flex; gap: 10px; align-items: center; justify-content: center; }
 .user-pill { background: #333; padding: 5px 12px; border-radius: 20px; font-size: 0.9rem; white-space: nowrap; }
 .btn-logout { background: var(--danger); color: white; padding: 5px 15px; font-size: 0.8rem; border-radius: 5px; border: none; cursor: pointer; }
+.btn-install-pwa { 
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%); 
+    color: white; 
+    padding: 8px 16px; 
+    font-size: 0.85rem; 
+    border-radius: 20px; 
+    border: 2px solid #2e7d32; 
+    cursor: pointer; 
+    font-weight: bold;
+    box-shadow: 0 3px 0 #1b5e20;
+    transition: all 0.2s ease;
+}
+.btn-install-pwa:hover { 
+    transform: translateY(-2px); 
+    box-shadow: 0 5px 0 #1b5e20; 
+}
+.btn-install-pwa:active { 
+    transform: translateY(1px); 
+    box-shadow: 0 2px 0 #1b5e20; 
+}
 .notification-bell { font-size: 1.5rem; cursor: pointer; position: relative; transition: transform 0.2s; }
 .bell-active::after { content: '✓'; position: absolute; top: -5px; right: -5px; font-size: 0.7rem; background: var(--success); color: white; border-radius: 50%; width: 15px; height: 15px; display: flex; justify-content: center; align-items: center; }
 
@@ -167,6 +187,45 @@ nav { background: var(--dark); border-bottom: 4px solid var(--secondary); paddin
 }
 
 #cooldown-display { margin-top: 15px; color: #ff6b6b; font-weight: bold; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px; display: inline-block; }
+
+/* --- PACKS DISPLAY --- */
+.packs-display {
+    transition: all 0.3s ease;
+}
+
+.packs-ready-animation {
+    animation: packsReady 2s ease-out;
+}
+
+@keyframes packsReady {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 rgba(255, 222, 0, 0);
+    }
+    10% {
+        transform: scale(1.2);
+    }
+    20% {
+        transform: scale(1.1);
+        box-shadow: 0 0 30px rgba(255, 222, 0, 0.8);
+    }
+    40% {
+        transform: scale(1.15);
+        box-shadow: 0 0 40px rgba(255, 222, 0, 1);
+    }
+    60% {
+        transform: scale(1.1);
+        box-shadow: 0 0 30px rgba(255, 222, 0, 0.6);
+    }
+    80% {
+        transform: scale(1.05);
+        box-shadow: 0 0 15px rgba(255, 222, 0, 0.3);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 rgba(255, 222, 0, 0);
+    }
+}
 
 /* --- TOOLBAR --- */
 .toolbar {
@@ -411,6 +470,15 @@ td:nth-child(5) > div { display: flex; gap: 5px; flex-wrap: wrap; align-items: c
 /* POPUP */
 .popup-box { background: #2c3e50; border: 2px solid var(--secondary); border-radius: 15px; padding: 25px; width: 350px; text-align: center; color: white; box-shadow: 0 0 30px rgba(255, 222, 0, 0.3); }
 .popup-title { font-family: 'Roboto Condensed', sans-serif; font-size: 1.5rem; color: var(--secondary); margin-bottom: 30px; }
+.popup-msg h3 { 
+    font-family: 'Roboto Condensed', sans-serif; 
+    font-size: 1.1rem; 
+    color: var(--secondary); 
+    margin: 20px 0 10px 0; 
+    text-align: left;
+    font-weight: bold;
+}
+.popup-msg h3:first-child { margin-top: 0; }
 .btn-popup { background: var(--primary); color: white; border: none; padding: 10px 30px; border-radius: 25px; font-weight: bold; cursor: pointer; margin-top: 40px; }
 
 #dl-toast { position: fixed; bottom: 20px; right: 20px; width: 300px; background: #2c3e50; color: white; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); z-index: 9999; border-left: 5px solid var(--secondary); }
