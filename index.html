@@ -46,6 +46,7 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
@@ -56,6 +57,10 @@
 
     <div id="booster-overlay" style="display:none;">
         <h2 class="opening-title">CLIQUEZ POUR RÉVÉLER !</h2>
+        <div class="booster-actions">
+            <button id="reveal-all-btn" onclick="revealAllCards()" class="btn-action">👁️ Tout Révéler</button>
+            <button id="screenshot-btn" onclick="screenshotBooster()" class="btn-action" style="display:none;">📸 Capturer</button>
+        </div>
         <div id="booster-cards-container"></div>
         <button id="close-booster-btn" onclick="closeBooster()" style="display:none;">AJOUTER À LA COLLECTION</button>
     </div>

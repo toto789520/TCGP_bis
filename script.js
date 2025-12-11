@@ -1013,6 +1013,8 @@ function openBoosterVisual(alreadyRevealed = []) {
                 // Si tout est révélé, on montre le bouton OK
                 if(cardsRevealed === tempBoosterCards.length) {
                     closeBtn.style.display = 'block';
+                    document.getElementById('reveal-all-btn').style.display = 'none';
+                    document.getElementById('screenshot-btn').style.display = 'inline-block';
                 }
             }
         };
@@ -1023,8 +1025,89 @@ function openBoosterVisual(alreadyRevealed = []) {
     // Si toutes les cartes sont déjà révélées, afficher le bouton directement
     if (cardsRevealed === tempBoosterCards.length) {
         closeBtn.style.display = 'block';
+        document.getElementById('reveal-all-btn').style.display = 'none';
+        document.getElementById('screenshot-btn').style.display = 'inline-block';
     }
 }
+
+// Révéler toutes les cartes d'un coup
+window.revealAllCards = async () => {
+    const flipCards = document.querySelectorAll('.flip-card:not(.flipped)');
+    const user = auth.currentUser;
+    
+    flipCards.forEach((card, index) => {
+        setTimeout(() => {
+            card.classList.add('flipped');
+        }, index * 100); // Animation en cascade
+    });
+    
+    // Sauvegarder toutes les cartes comme révélées
+    if (user) {
+        try {
+            const allIndices = Array.from({length: tempBoosterCards.length}, (_, i) => i);
+            await setDoc(doc(db, "players", user.uid), {
+                boosterRevealedCards: allIndices
+            }, { merge: true });
+        } catch (e) {
+            console.error("Erreur sauvegarde révélation complète:", e);
+        }
+    }
+    
+    // Afficher les boutons
+    setTimeout(() => {
+        document.getElementById('close-booster-btn').style.display = 'block';
+        document.getElementById('reveal-all-btn').style.display = 'none';
+        document.getElementById('screenshot-btn').style.display = 'inline-block';
+    }, flipCards.length * 100 + 600);
+};
+
+// Capturer l'écran de l'ouverture
+window.screenshotBooster = async () => {
+    const container = document.getElementById('booster-cards-container');
+    const title = document.querySelector('.opening-title');
+    const actions = document.querySelector('.booster-actions');
+    const closeBtn = document.getElementById('close-booster-btn');
+    
+    // Masquer temporairement les boutons
+    const originalTitleDisplay = title.style.display;
+    const originalActionsDisplay = actions.style.display;
+    const originalCloseBtnDisplay = closeBtn.style.display;
+    
+    title.style.display = 'none';
+    actions.style.display = 'none';
+    closeBtn.style.display = 'none';
+    
+    try {
+        // Utiliser html2canvas si disponible, sinon fallback
+        if (typeof html2canvas !== 'undefined') {
+            const canvas = await html2canvas(container, {
+                backgroundColor: '#2c3e50',
+                scale: 2,
+                logging: false
+            });
+            
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `booster-${Date.now()}.png`;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+        } else {
+            // Fallback: copier dans le presse-papier si possible
+            window.showPopup("Info", "Utilisez la touche 'Impr écran' de votre clavier pour capturer l'écran.");
+        }
+    } catch (e) {
+        console.error("Erreur capture:", e);
+        window.showPopup("Erreur", "Impossible de capturer. Utilisez 'Impr écran' sur votre clavier.");
+    } finally {
+        // Restaurer les boutons
+        title.style.display = originalTitleDisplay;
+        actions.style.display = originalActionsDisplay;
+        closeBtn.style.display = originalCloseBtnDisplay;
+    }
+};
 
 window.closeBooster = async () => {
     document.getElementById('booster-overlay').style.display = 'none';
