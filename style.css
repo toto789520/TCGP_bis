@@ -277,3 +277,481 @@ tr:hover { background: #2a2a2a; }
     display: flex;
     align-items: center;
 }
+
+/* ===== RESPONSIVE DESIGN ===== */
+
+/* Très petits écrans (< 480px) - Smartphones en portrait */
+@media (max-width: 479px) {
+    nav {
+        flex-direction: column;
+        padding: 10px 15px;
+        text-align: center;
+    }
+    
+    .nav-logo {
+        font-size: 1.3rem;
+    }
+    
+    .player-stats {
+        flex-wrap: wrap;
+        font-size: 0.85rem;
+    }
+    
+    .login-box {
+        width: 95%;
+        max-width: 320px;
+        padding: 1.5rem;
+    }
+    
+    .logo-img {
+        width: 80%;
+        max-width: 180px;
+    }
+    
+    .btn-group {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .action-area {
+        padding: 15px 5px;
+    }
+    
+    .custom-select-wrapper {
+        width: 95%;
+        max-width: 280px;
+        margin: 8px auto;
+    }
+    
+    .btn-booster {
+        width: 95%;
+        max-width: 280px;
+        padding: 12px 20px;
+        font-size: 1rem;
+    }
+    
+    .toolbar {
+        flex-direction: column;
+        padding: 10px;
+        margin: 10px;
+    }
+    
+    .search-container,
+    .sort-container {
+        width: 100%;
+    }
+    
+    .filter-toggles {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .toggle-visual {
+        padding: 8px 15px;
+        font-size: 0.8rem;
+    }
+    
+    .grid-container {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 15px;
+        row-gap: 35px;
+        padding: 15px 10px;
+    }
+    
+    .tcg-card {
+        border-width: 6px;
+        padding: 8px;
+        font-size: 9px;
+    }
+    
+    .rarity-badge {
+        font-size: 0.6em;
+        padding: 3px 8px;
+        top: -18px;
+    }
+    
+    .card-name {
+        font-size: 0.95em;
+    }
+    
+    .type-icon {
+        width: 12px;
+        height: 12px;
+    }
+    
+    .type-icon.big {
+        width: 15px;
+        height: 15px;
+    }
+    
+    #booster-cards-container {
+        flex-wrap: wrap;
+        gap: 15px;
+        padding: 5px;
+    }
+    
+    .flip-card {
+        width: 140px;
+        min-height: 200px;
+    }
+    
+    .flip-card-front::after {
+        font-size: 1.5rem;
+    }
+    
+    .flip-card-back .tcg-card {
+        border-width: 4px;
+    }
+    
+    #close-booster-btn {
+        padding: 12px 30px;
+        font-size: 1rem;
+    }
+    
+    .popup-box {
+        width: 95%;
+        max-width: 300px;
+        padding: 20px;
+    }
+    
+    .admin-container {
+        padding: 10px;
+        margin: 20px 10px;
+    }
+    
+    .admin-header {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .admin-title {
+        font-size: 1.5rem;
+    }
+    
+    .btn-action {
+        font-size: 0.7rem;
+        padding: 6px 10px;
+        margin-bottom: 5px;
+    }
+}
+
+/* Petits écrans (480px - 767px) - Smartphones en paysage / petites tablettes */
+@media (min-width: 480px) and (max-width: 767px) {
+    nav {
+        flex-wrap: wrap;
+        padding: 12px 20px;
+    }
+    
+    .nav-logo {
+        font-size: 1.5rem;
+    }
+    
+    .player-stats {
+        flex-wrap: wrap;
+    }
+    
+    .login-box {
+        width: 90%;
+        max-width: 360px;
+        padding: 2rem;
+    }
+    
+    .logo-img {
+        width: 85%;
+        max-width: 200px;
+    }
+    
+    .custom-select-wrapper {
+        width: 90%;
+        max-width: 300px;
+    }
+    
+    .btn-booster {
+        width: 90%;
+        max-width: 300px;
+    }
+    
+    .toolbar {
+        flex-direction: column;
+        padding: 12px;
+        margin: 15px;
+    }
+    
+    .search-container,
+    .sort-container {
+        width: 100%;
+    }
+    
+    .filter-toggles {
+        flex-wrap: wrap;
+    }
+    
+    .grid-container {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 18px;
+        row-gap: 40px;
+        padding: 20px 15px;
+    }
+    
+    .tcg-card {
+        border-width: 7px;
+        font-size: 10px;
+    }
+    
+    .rarity-badge {
+        font-size: 0.65em;
+        top: -20px;
+    }
+    
+    #booster-cards-container {
+        flex-wrap: wrap;
+        gap: 18px;
+    }
+    
+    .flip-card {
+        width: 160px;
+        min-height: 230px;
+    }
+    
+    .popup-box {
+        width: 90%;
+        max-width: 330px;
+    }
+    
+    .admin-container {
+        padding: 15px;
+        margin: 30px 15px;
+    }
+    
+    .admin-header {
+        flex-wrap: wrap;
+    }
+}
+
+/* Tablettes (768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+    .nav-logo {
+        font-size: 1.6rem;
+    }
+    
+    .login-box {
+        width: 380px;
+    }
+    
+    .toolbar {
+        flex-wrap: wrap;
+        padding: 13px;
+        margin: 18px;
+    }
+    
+    .search-container {
+        flex: 1;
+        min-width: 250px;
+    }
+    
+    .sort-container {
+        width: 220px;
+    }
+    
+    .filter-toggles {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+    
+    .grid-container {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 20px;
+        row-gap: 45px;
+        padding: 30px 20px;
+    }
+    
+    .tcg-card {
+        border-width: 8px;
+        font-size: 10px;
+    }
+    
+    #booster-cards-container {
+        flex-wrap: wrap;
+    }
+    
+    .flip-card {
+        width: 180px;
+        min-height: 250px;
+    }
+}
+
+/* Petits desktops / grandes tablettes (1024px - 1279px) */
+@media (min-width: 1024px) and (max-width: 1279px) {
+    .toolbar {
+        padding: 14px;
+        margin: 19px auto;
+    }
+    
+    .grid-container {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 22px;
+        row-gap: 48px;
+        padding: 35px 25px;
+    }
+    
+    .tcg-card {
+        border-width: 9px;
+    }
+    
+    #booster-cards-container {
+        flex-wrap: wrap;
+    }
+    
+    .flip-card {
+        width: 190px;
+        min-height: 265px;
+    }
+}
+
+/* Grands écrans (1280px - 1919px) - Configuration par défaut optimisée */
+@media (min-width: 1280px) and (max-width: 1919px) {
+    .grid-container {
+        padding: 40px 30px;
+    }
+}
+
+/* Très grands écrans (≥ 1920px) - 4K et plus */
+@media (min-width: 1920px) {
+    .nav-logo {
+        font-size: 2rem;
+    }
+    
+    .login-box {
+        width: 400px;
+        padding: 3rem;
+    }
+    
+    .logo-img {
+        width: 250px;
+    }
+    
+    .toolbar {
+        max-width: 1600px;
+        padding: 18px;
+    }
+    
+    .grid-container {
+        max-width: 1800px;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 30px;
+        row-gap: 60px;
+        padding: 50px;
+    }
+    
+    .tcg-card {
+        border-width: 11px;
+        font-size: 12px;
+    }
+    
+    .rarity-badge {
+        font-size: 0.8em;
+        top: -24px;
+    }
+    
+    .flip-card {
+        width: 220px;
+        min-height: 310px;
+    }
+    
+    #close-booster-btn {
+        padding: 18px 50px;
+        font-size: 1.3rem;
+    }
+    
+    .admin-container {
+        max-width: 1600px;
+    }
+}
+
+/* Orientation paysage pour petits écrans */
+@media (max-height: 600px) and (orientation: landscape) {
+    nav {
+        padding: 8px 20px;
+    }
+    
+    .nav-logo {
+        font-size: 1.2rem;
+    }
+    
+    .login-box {
+        padding: 1.5rem;
+        max-width: 300px;
+    }
+    
+    .logo-img {
+        width: 120px;
+        margin-bottom: 10px;
+    }
+    
+    .action-area {
+        padding: 15px 10px;
+    }
+    
+    .toolbar {
+        padding: 10px;
+        margin: 10px;
+    }
+    
+    .grid-container {
+        padding: 20px 15px;
+        gap: 15px;
+        row-gap: 30px;
+    }
+    
+    #booster-overlay .opening-title {
+        font-size: 1rem;
+        margin-bottom: 15px;
+    }
+    
+    .flip-card {
+        width: 140px;
+        min-height: 200px;
+    }
+}
+
+/* Pour les écrans tactiles */
+@media (hover: none) and (pointer: coarse) {
+    .tcg-card:hover {
+        transform: none;
+    }
+    
+    .tcg-card:active {
+        transform: scale(0.98);
+    }
+    
+    button:active,
+    .btn-booster:not(:disabled):active {
+        transform: scale(0.95);
+    }
+    
+    .flip-card {
+        cursor: default;
+    }
+}
+
+/* Mode impression */
+@media print {
+    nav,
+    .toolbar,
+    .action-area,
+    #booster-overlay,
+    #auth-overlay,
+    button {
+        display: none !important;
+    }
+    
+    .grid-container {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+    }
+    
+    .tcg-card {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+}
