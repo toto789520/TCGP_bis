@@ -21,6 +21,38 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
+// --- GESTION INSTANCE UNIQUE ---
+const CHANNEL_NAME = 'tcgp_single_instance';
+const bc = new BroadcastChannel(CHANNEL_NAME);
+let isMainTab = false;
+
+// Vérifier si une autre instance existe
+bc.postMessage({ type: 'ping' });
+
+setTimeout(() => {
+    isMainTab = true;
+}, 100);
+
+bc.onmessage = (event) => {
+    if (event.data.type === 'ping' && isMainTab) {
+        bc.postMessage({ type: 'exists' });
+    } else if (event.data.type === 'exists') {
+        // Une autre instance existe déjà
+        document.body.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #1a1a1a; color: white; text-align: center; padding: 20px;">
+                <h1 style="color: #ffde00; font-size: 3rem; margin-bottom: 20px;">⚠️ Instance Déjà Ouverte</h1>
+                <p style="font-size: 1.2rem; margin-bottom: 30px;">Le jeu est déjà ouvert dans un autre onglet.</p>
+                <p style="font-size: 1rem; color: #999;">Fermez cet onglet ou fermez l'autre instance pour continuer ici.</p>
+            </div>
+        `;
+        return;
+    }
+};
+
+window.addEventListener('beforeunload', () => {
+    bc.close();
+});
+
 // Liste des Générations
 const GEN_LIST = [
     { id: "gen1", name: "Gen 1 - Kanto" },
