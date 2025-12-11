@@ -1,5 +1,5 @@
 // Service Worker pour PWA
-const CACHE_NAME = 'poke-tcg-v4';
+const CACHE_NAME = 'poke-tcg-v5';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -71,10 +71,16 @@ self.addEventListener('fetch', event => {
     return;
   }
   
-  // Ignorer les requêtes Firebase
+  // Ignorer les requêtes Firebase et Google Auth
   if (event.request.url.includes('firebasestorage') || 
       event.request.url.includes('firebaseapp') ||
-      event.request.url.includes('googleapis')) {
+      event.request.url.includes('googleapis') ||
+      event.request.url.includes('google.com/accounts') ||
+      event.request.url.includes('gstatic.com/firebasejs') ||
+      event.request.url.includes('identitytoolkit') ||
+      event.request.url.includes('securetoken') ||
+      event.request.url.includes('__/auth/')) {
+    swLog('debug', 'Requête Firebase/Auth ignorée: ' + event.request.url);
     return;
   }
   
