@@ -106,10 +106,16 @@ onAuthStateChanged(auth, async (user) => {
         
         // Vérif Admin (Basique sur email)
         const isAdmin = (user.email === ADMIN_EMAIL);
-        const adminLink = document.getElementById('admin-link-container');
-        if(adminLink) adminLink.style.display = isAdmin ? 'block' : 'none';
         const adminPreview = document.getElementById('admin-preview-container');
         if(adminPreview) adminPreview.style.display = isAdmin ? 'block' : 'none';
+        
+        // Redirection admin au clic sur le profil
+        const userProfilePill = document.getElementById('user-profile-pill');
+        if(userProfilePill) {
+            userProfilePill.onclick = () => {
+                if(isAdmin) window.location.href = 'admin.html';
+            };
+        }
 
         // Check Notifications (Visuel uniquement)
         updateBellIcon();

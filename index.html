@@ -50,7 +50,7 @@
             <div class="nav-logo">TCG <span class="version">Binder</span></div>
             <div class="player-stats">
                 <span id="notif-bell" class="notification-bell" onclick="requestNotification()" title="Activer les notifications">🔔</span>
-                <span class="user-pill">👤 <span id="user-display">...</span></span>
+                <span class="user-pill" id="user-profile-pill" style="cursor: pointer;">👤 <span id="user-display">...</span></span>
                 <span class="user-pill">🃏 <span id="card-count">0</span></span>
                 <button onclick="logout()" class="btn-logout">Sortir</button>
             </div>
@@ -109,10 +109,6 @@
                         <span class="toggle-visual">👁️ Afficher Toutes</span>
                     </label>
                 </div>
-            </div>
-
-            <div id="admin-link-container" style="display: none; margin-top: 20px;">
-                <a href="admin.html" class="btn-admin-link">⚙️ ADMIN</a>
             </div>
         </div>
 
