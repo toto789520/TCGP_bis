@@ -59,11 +59,13 @@ window.loadAllPlayers = async () => {
                 <td style="color:${roleColor}; font-weight:bold;">${roleIcon} ${role.toUpperCase()}</td>
                 <td><span class="user-pill">🃏 ${data.collection ? data.collection.length : 0}</span></td>
                 <td>${lastDraw}</td>
-                <td style="display:flex; gap:5px; flex-wrap:wrap;">
-                    <button onclick="toggleRole('${docSnap.id}', '${role}')" class="btn-action btn-role" style="background:#8e44ad">⬆️ Rôle</button>
-                    <button onclick="resetCooldown('${docSnap.id}', '${data.email}')" class="btn-action btn-cooldown">⏳ Reset</button>
-                    <button onclick="resetPlayer('${docSnap.id}', '${data.email}')" class="btn-action btn-reset">⚠️ Deck</button>
-                    <button onclick="deleteAccount('${docSnap.id}', '${data.email}')" class="btn-action btn-delete">❌ DEL</button>
+                <td>
+                    <div>
+                        <button onclick="toggleRole('${docSnap.id}', '${role}')" class="btn-action btn-role" style="background:#8e44ad">⬆️ Rôle</button>
+                        <button onclick="resetCooldown('${docSnap.id}', '${data.email}')" class="btn-action btn-cooldown">⏳ Reset</button>
+                        <button onclick="resetPlayer('${docSnap.id}', '${data.email}')" class="btn-action btn-reset">⚠️ Deck</button>
+                        <button onclick="deleteAccount('${docSnap.id}', '${data.email}')" class="btn-action btn-delete">❌ DEL</button>
+                    </div>
                 </td>`;
             list.appendChild(tr);
         });
