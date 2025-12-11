@@ -23,7 +23,7 @@ html, body {
 }
 #global-loader { background: #1a1a1a; }
 #auth-overlay { background: radial-gradient(circle at center, rgba(20, 20, 30, 0.95), #000); backdrop-filter: blur(5px); z-index: 1000; }
-#booster-overlay { background: radial-gradient(circle, #2c3e50 0%, #000 100%); z-index: 15000; perspective: 1000px; }
+#booster-overlay { background: radial-gradient(circle, #2c3e50 0%, #000 100%); z-index: 15000; perspective: 1000px; overflow: hidden; }
 #custom-popup-overlay { background: rgba(0,0,0,0.8); z-index: 20000; backdrop-filter: blur(5px); }
 
 .pokeball-spinner { width: 60px; height: 60px; position: relative; border: 3px solid #fff; border-radius: 50%; overflow: hidden; margin-bottom: 20px; animation: shake 1s infinite ease-in-out; }
@@ -124,50 +124,61 @@ nav { background: var(--dark); border-bottom: 4px solid var(--secondary); paddin
     background: #f4f4f4;
     color: #222;
     border-radius: 14px;
-    min-height: 320px;
     height: 100%;
     position: relative;
-    padding: 10px;
+    padding: 8px;
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     border: 10px solid #dec225;
-    box-shadow: -5px 5px 15px rgba(0,0,0,0.5);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.2);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     overflow: visible;
     font-size: 11px;
 }
 
-.tcg-card:hover { transform: scale(1.05) translateY(-5px); z-index: 999; box-shadow: 0 20px 30px rgba(0,0,0,0.5); }
-.tcg-card.secret:hover { transform: scale(1.05) translateY(-5px); box-shadow: 0 20px 40px rgba(255, 0, 200, 0.7), 0 0 30px rgba(255, 0, 200, 0.5); }
+.tcg-card:hover { transform: scale(1.05) translateY(-5px); z-index: 999; box-shadow: 0 15px 35px rgba(0,0,0,0.4), 0 5px 15px rgba(0,0,0,0.3); }
+.tcg-card.secret:hover { transform: scale(1.05) translateY(-5px); box-shadow: 0 20px 40px rgba(255, 0, 200, 0.5), 0 10px 25px rgba(255, 0, 200, 0.3), 0 0 30px rgba(255, 0, 200, 0.4); }
 
-.card-placeholder { background: rgba(255,255,255,0.05); border: 2px dashed #444; border-radius: 14px; aspect-ratio: 0.715; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #555; position: relative; opacity: 0.8; }
+.card-placeholder { 
+    background: rgba(255,255,255,0.05); 
+    border: 2px dashed #444; 
+    border-radius: 14px; 
+    height: 100%;
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    justify-content: center; 
+    color: #555; 
+    position: relative; 
+    opacity: 0.8; 
+}
 .placeholder-id { font-size: 1.5rem; font-weight: bold; font-family: 'Roboto Condensed'; }
 .card-quantity { position: absolute; bottom: 5px; right: 5px; background: rgba(0,0,0,0.8); color: #fff; padding: 2px 8px; border-radius: 10px; font-weight: bold; border: 1px solid #555; z-index: 15; }
 
-.card-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 4px; }
+.card-header { display: flex; justify-content: space-between; align-items: flex-end; }
 .card-name {
     font-weight: bold;
     font-size: 1.1em;
     font-family: 'Roboto Condensed';
-    /* On enlève le bloquage sur une seule ligne */
     white-space: normal; 
     overflow: visible;
     text-overflow: clip;
-    max-width: 75%; /* Laisse de la place aux PV */
+    max-width: 75%;
     line-height: 1.1;
+    padding-bottom: 8px;
 }
 .hp-group { display: flex; align-items: center; gap: 3px; color: #d00; font-weight: bold; }
-.img-frame { margin-bottom: 5px; position: relative; }
+.img-frame { margin-bottom: 3px; position: relative; }
 .card-img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; }
-.card-body { flex: 1; background: rgba(255,255,255,0.6); padding: 3px; border-radius: 4px; overflow: hidden; }
-.card-description { padding: 8px; font-size: 1em; line-height: 1.4; text-align: left; color: #333; font-style: italic; }
+.card-body { height:100%; background: rgba(255,255,255,0.6); padding: 2px; border-radius: 4px; overflow: hidden; }
+.card-description { padding: 4px 6px; font-size: 0.95em; line-height: 1.3; text-align: left; color: #333; }
 .move-row {
     display: flex;
-    align-items: flex-start; /* Aligne en haut si le texte fait 2 lignes */
-    margin-bottom: 6px;
+    align-items: flex-start;
+    margin-bottom: 4px;
     border-bottom: 1px solid rgba(0,0,0,0.1);
-    padding-bottom: 2px;
+    padding-bottom: 1px;
 }
 .cost-icons { display: flex; gap: 1px; min-width: 40px; }
 .move-info {
@@ -179,8 +190,8 @@ nav { background: var(--dark); border-bottom: 4px solid var(--secondary); paddin
     text-overflow: clip;
 }
 .move-dmg { font-weight: bold; }
-.card-footer { display: flex; justify-content: space-between; margin-top: 4px; border-top: 2px solid #aaa; font-size: 0.75em; text-align: center; color: #444; }
-.stat-box { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.card-footer { display: flex; justify-content: space-between; margin-top: 2px; border-top: 2px solid #aaa; font-size: 0.75em; text-align: center; color: #444; padding-top: 2px; }
+.stat-box { display: flex; flex-direction: column; align-items: center; gap: 1px; }
 
 .type-icon { width: 14px; height: 14px; vertical-align: middle; filter: drop-shadow(1px 1px 0 rgba(0,0,0,0.2)); }
 .type-icon.big { width: 18px; height: 18px; }
@@ -212,11 +223,11 @@ nav { background: var(--dark); border-bottom: 4px solid var(--secondary); paddin
 
 /* --- OPENING ANIMATION --- */
 .opening-title { color: var(--secondary); font-family: 'Roboto Condensed'; text-transform: uppercase; margin-bottom: 30px; letter-spacing: 2px; text-shadow: 0 0 10px #ffac00; text-align: center; }
-#booster-cards-container { display: flex; gap: 20px; justify-content: center; max-width: 1200px; padding: 10px; }
+#booster-cards-container { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; max-width: 1400px; padding: 10px; }
 .flip-card {
     background-color: transparent;
-    width: 200px;
-    min-height: 280px; 
+    width: 240px;
+    min-height: 340px; 
     height: auto;
     perspective: 1000px;
     cursor: pointer;
@@ -227,14 +238,28 @@ nav { background: var(--dark); border-bottom: 4px solid var(--secondary); paddin
 .flip-card:nth-child(1) { animation-delay: 0.1s; } .flip-card:nth-child(2) { animation-delay: 0.2s; } .flip-card:nth-child(3) { animation-delay: 0.3s; }
 .flip-card:nth-child(4) { animation-delay: 0.4s; } .flip-card:nth-child(5) { animation-delay: 0.5s; } .flip-card:nth-child(6) { animation-delay: 0.6s; }
 @keyframes dealCard { from { opacity: 0; transform: translateY(50px) scale(0.8); } to { opacity: 1; transform: translateY(0) scale(1); } }
-.flip-card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; box-shadow: 0 4px 8px rgba(0,0,0,0.5); border-radius: 14px; }
+.flip-card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; box-shadow: 0 4px 12px rgba(0,0,0,0.25), 0 2px 4px rgba(0,0,0,0.15); border-radius: 14px; }
 .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
-.flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; -webkit-backface-visibility: hidden; backface-visibility: hidden; border-radius: 14px; }
-.flip-card-front { min-height: 280px; height: 100%; overflow: hidden; background: #1a252f; border: 4px solid var(--primary); display: flex; align-items: center; justify-content: center; background-image: repeating-linear-gradient(45deg, #1a252f 0, #1a252f 10px, #23303d 10px, #23303d 20px); }
-.flip-card-front::after { content: 'TCG'; color: var(--primary); font-weight: 900; font-size: 2rem; transform: rotate(-45deg); opacity: 0.5; }
-.flip-card-back { overflow: visible; transform: rotateY(180deg); height: auto; min-height: 100%;}
+.flip-card-front, .flip-card-back { position: absolute; width: 100%; -webkit-backface-visibility: hidden; backface-visibility: hidden; border-radius: 14px; }
+.flip-card-front { min-height: 340px; height: auto; overflow: hidden; background: #1a252f; border: 4px solid var(--primary); display: flex; align-items: center; justify-content: center; background-image: repeating-linear-gradient(45deg, #1a252f 0, #1a252f 10px, #23303d 10px, #23303d 20px); }
+.flip-card-front::after { content: 'TCG'; color: var(--primary); font-weight: 900; font-size: 2.5rem; transform: rotate(-45deg); opacity: 0.5; }
+.flip-card-back { overflow: visible; transform: rotateY(180deg); min-height: 340px; height: auto;}
 .flip-card-back .tcg-card { width: 100%; height: 100%; box-shadow: none; border-width: 5px; }
-#close-booster-btn { margin-top: 30px; padding: 15px 40px; font-size: 1.2rem; font-weight: bold; background: #4caf50; color: white; border: none; border-radius: 50px; cursor: pointer; box-shadow: 0 0 20px rgba(76, 175, 80, 0.5); animation: popIn 0.3s; }
+#close-booster-btn { 
+    margin-top: 30px; 
+    padding: 15px 40px; 
+    font-size: 1.2rem; 
+    font-weight: bold; 
+    background: #4caf50; 
+    color: white; 
+    border: none; 
+    border-radius: 50px; 
+    cursor: pointer; 
+    box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4), 0 4px 10px rgba(76, 175, 80, 0.3); 
+    animation: popIn 0.3s;
+    position: relative;
+    z-index: 10000;
+}
 
 /* --- ADMIN --- */
 .admin-container { max-width: 1200px; margin: 40px auto; padding: 20px; }
@@ -270,7 +295,6 @@ tr:hover { background: #2a2a2a; }
     line-height: 1.4;
     text-align: left;
     color: #333;
-    font-style: italic;
     white-space: normal;
     overflow: visible;
     flex-grow: 1;
