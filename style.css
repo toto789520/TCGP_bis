@@ -89,6 +89,28 @@ nav { background: var(--dark); border-bottom: 4px solid var(--secondary); paddin
 .btn-booster:active { transform: translateY(4px); box-shadow: 0 2px 0 #2a3693; }
 .btn-booster:disabled, .btn-booster.disabled { background: #555; border-color: #333; cursor: not-allowed; box-shadow: none; color: #999; transform: none !important; }
 
+.btn-info {
+    background: linear-gradient(135deg, #4a90e2 0%, #357ab8 100%);
+    border: 3px solid #2a5a8a;
+    padding: 10px 15px;
+    border-radius: 50%;
+    margin: 10px 5px;
+    font-size: 1rem;
+    color: white;
+    cursor: pointer;
+    font-weight: bold;
+    box-shadow: 0 4px 0 #1a3a5a;
+    transition: all 0.2s ease;
+    width: 45px;
+    height: 45px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+}
+.btn-info:hover { transform: translateY(-2px); box-shadow: 0 6px 0 #1a3a5a; }
+.btn-info:active { transform: translateY(2px); box-shadow: 0 2px 0 #1a3a5a; }
+
 #cooldown-display { margin-top: 15px; color: #ff6b6b; font-weight: bold; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px; display: inline-block; }
 
 /* --- TOOLBAR --- */

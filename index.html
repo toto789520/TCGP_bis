@@ -70,9 +70,15 @@
                 <div class="booster-content">CHARGEMENT...</div>
             </button>
             
+            <button onclick="showDropRates()" class="btn-info" title="Probabilités de drop">
+                <span style="font-size: 1.2rem; font-weight: bold;">ℹ️</span>
+            </button>
+            
             <div id="cooldown-display" style="display:none;">
                 ⏳ Prochain dans : <span id="timer-val">00:00</span>
             </div>
+            
+            <div id="rarity-stats" style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin: 15px 0; font-size: 0.9rem;"></div>
             
             <div class="toolbar">
                 <div class="search-container">
@@ -82,12 +88,12 @@
                 
                 <div class="sort-container">
                     <select id="sort-select" onchange="filterBinder()" aria-label="Trier par">
-                        <option value="id"># Numéro</option>
-                        <option value="name">🔤 Nom</option>
+                        <option value="id-asc"># 1→999</option>
+                        <option value="id-desc"># 999→1</option>
+                        <option value="name-asc">🔤 A→Z</option>
+                        <option value="name-desc">🔤 Z→A</option>
                         <option value="rarity-desc">💎 + Rares</option>
                         <option value="rarity-asc">💎 - Rares</option>
-                        <option value="owned-desc">✅ Possédées</option>
-                        <option value="owned-asc">❌ Manquantes</option>
                     </select>
                     <span class="sort-arrow">▼</span>
                 </div>

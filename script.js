@@ -158,15 +158,45 @@ window.showPopup = (title, msg) => {
     const el = document.getElementById('custom-popup-overlay');
     if(el) {
         document.getElementById('popup-title').innerText = title;
-        document.getElementById('popup-msg').innerText = msg;
+        // Utiliser innerHTML pour supporter le formatage HTML
+        const msgEl = document.getElementById('popup-msg');
+        msgEl.innerHTML = msg.replace(/\n/g, '<br>');
+        msgEl.style.textAlign = 'left';
+        msgEl.style.whiteSpace = 'pre-line';
         el.style.display = 'flex';
     } else {
-        alert(title + "\n" + msg);
+        alert(title + "\n" + msg.replace(/<[^>]*>/g, ''));
     }
 };
 window.closePopup = () => { 
     const el = document.getElementById('custom-popup-overlay');
     if(el) el.style.display = 'none'; 
+};
+
+// --- AFFICHAGE DES PROBABILITÉS ---
+window.showDropRates = () => {
+    const packInfo = `
+<strong>🎲 TAILLE DU PACK :</strong>
+• 50% de chance d'obtenir 4 cartes
+• 50% de chance d'obtenir 5 cartes
+
+<strong>📊 PROBABILITÉS DE RARETÉ (Cartes 1-4) :</strong>
+• ⚪ Commune : 56%
+• 🟢 Peu Commune : 26%
+• 🔵 Rare : 14%
+• 🟣 Ultra Rare : 3.8%
+• ⭐ Secrète : 0.2%
+
+<strong>✨ 5ème CARTE (si pack de 5) :</strong>
+• 🔵 Rare : 70%
+• 🟣 Ultra Rare : 30%
+(Pas de commune, peu commune ou secrète)
+
+<strong>🚫 LIMITE :</strong>
+Maximum 2 cartes identiques par pack
+    `.trim();
+    
+    window.showPopup("🎮 SYSTÈME DE DROP", packInfo);
 };
 
 // --- AUTHENTIFICATION ---
@@ -346,22 +376,61 @@ function renderBinder() {
     
     filteredCards.sort((a, b) => {
         switch(sortType) {
-            case 'name':
+            case 'name-asc':
                 return a.name.localeCompare(b.name);
+            case 'name-desc':
+                return b.name.localeCompare(a.name);
             case 'rarity-desc':
                 return (rarityValues[b.rarityKey] || 0) - (rarityValues[a.rarityKey] || 0);
             case 'rarity-asc':
                 return (rarityValues[a.rarityKey] || 0) - (rarityValues[b.rarityKey] || 0);
-            case 'owned-desc':
-                return b.ownedCopies - a.ownedCopies;
-            case 'owned-asc':
-                return a.ownedCopies - b.ownedCopies;
-            case 'id':
+            case 'id-desc':
+                return b.id - a.id;
+            case 'id-asc':
             default:
                 return a.id - b.id;
         }
     });
 
+    // Calculer les stats par rareté
+    const rarityStats = {
+        common: { owned: 0, total: 0 },
+        uncommon: { owned: 0, total: 0 },
+        rare: { owned: 0, total: 0 },
+        ultra_rare: { owned: 0, total: 0 },
+        secret: { owned: 0, total: 0 }
+    };
+    
+    currentGenData.forEach(cardRef => {
+        const rarity = cardRef.rarityKey || 'common';
+        if (rarityStats[rarity]) {
+            rarityStats[rarity].total++;
+            const ownedCount = adminShowAllMode ? 1 : userCollection.filter(c => c.id === cardRef.id).length;
+            if (ownedCount > 0) rarityStats[rarity].owned++;
+        }
+    });
+    
+    // Afficher les stats
+    const statsContainer = document.getElementById('rarity-stats');
+    if (statsContainer) {
+        const labels = {
+            common: { emoji: '⚪', name: 'Communes' },
+            uncommon: { emoji: '🟢', name: 'Peu Com.' },
+            rare: { emoji: '🔵', name: 'Rares' },
+            ultra_rare: { emoji: '🟣', name: 'Ultra Rares' },
+            secret: { emoji: '⭐', name: 'Secrètes' }
+        };
+        
+        statsContainer.innerHTML = Object.entries(rarityStats)
+            .filter(([_, stats]) => stats.total > 0)
+            .map(([rarity, stats]) => {
+                const label = labels[rarity];
+                const percent = Math.round((stats.owned / stats.total) * 100);
+                return `<span style="color: ${stats.owned === stats.total ? '#4CAF50' : '#999'};">${label.emoji} ${label.name}: ${stats.owned}/${stats.total} (${percent}%)</span>`;
+            })
+            .join('');
+    }
+    
     // Message si aucun résultat
     if (filteredCards.length === 0) {
         grid.innerHTML = '<div style="color: #999; text-align: center; width: 100%; padding: 40px; font-size: 1.2rem;">❌ Aucune carte ne correspond aux filtres</div>';
@@ -379,7 +448,10 @@ function renderBinder() {
             // On force la rareté correcte (au cas où)
             const cardToRender = userCard ? { ...userCard, rarityKey: cardRef.rarityKey } : cardRef;
             
-            const el = createCardElement(cardToRender, ownedCopies);
+            // Calculer le total de cartes de cette génération
+            const totalCards = currentGenData.length;
+            
+            const el = createCardElement(cardToRender, ownedCopies, cardRef.displayId, totalCards);
             
             grid.appendChild(el);
         } else {
@@ -408,7 +480,7 @@ window.toggleAdminPreview = () => {
 };
 
 // Création du HTML d'une carte (Compatible Pokémon & Events)
-function createCardElement(card, quantity = 1) {
+function createCardElement(card, quantity = 1, cardNumber = null, totalCards = null) {
     const div = document.createElement('div');
     const mainType = card.types ? card.types[0] : 'Normal';
     const cssRarity = card.rarityKey ? card.rarityKey.replace('_', '-') : 'commune';
@@ -416,6 +488,9 @@ function createCardElement(card, quantity = 1) {
     const labels = {'common':'COMMUNE', 'uncommon':'PEU COM.', 'rare':'RARE', 'ultra_rare':'ULTRA RARE', 'secret':'SECRET'};
     const labelText = labels[card.rarityKey] || '';
     const label = quantity > 1 ? `${labelText}  |  x${quantity}` : labelText;
+    
+    // Ajouter le numéro dans le nom si disponible
+    const cardName = (cardNumber && totalCards) ? `N°${cardNumber}/${totalCards} | ${card.name}` : card.name;
     
     const icon = GAME_CONFIG.icons[mainType] || GAME_CONFIG.icons['Normal'];
     const weakIcon = GAME_CONFIG.icons[card.weakness] || GAME_CONFIG.icons['Normal'];
@@ -452,7 +527,7 @@ function createCardElement(card, quantity = 1) {
     div.innerHTML = `
         ${label ? `<div class="rarity-badge badge-${cssRarity}">${label}</div>` : ''}
         <div class="card-header">
-            <span class="card-name">${card.name}</span>
+            <span class="card-name">${cardName}</span>
             <div class="hp-group">${hpDisplay}</div>
         </div>
         <div class="img-frame">
