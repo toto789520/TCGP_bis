@@ -22,36 +22,79 @@ const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
 // --- GESTION INSTANCE UNIQUE ---
-const CHANNEL_NAME = 'tcgp_single_instance';
-const bc = new BroadcastChannel(CHANNEL_NAME);
-let isMainTab = false;
+const SESSION_ID = Date.now() + '_' + Math.random().toString(36);
+let sessionCheckInterval = null;
+let isBlocked = false;
 
-// Vérifier si une autre instance existe
-bc.postMessage({ type: 'ping' });
-
-setTimeout(() => {
-    isMainTab = true;
-}, 100);
-
-bc.onmessage = (event) => {
-    if (event.data.type === 'ping' && isMainTab) {
-        bc.postMessage({ type: 'exists' });
-    } else if (event.data.type === 'exists') {
-        // Une autre instance existe déjà
-        document.body.innerHTML = `
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #1a1a1a; color: white; text-align: center; padding: 20px;">
-                <h1 style="color: #ffde00; font-size: 3rem; margin-bottom: 20px;">⚠️ Instance Déjà Ouverte</h1>
-                <p style="font-size: 1.2rem; margin-bottom: 30px;">Le jeu est déjà ouvert dans un autre onglet.</p>
-                <p style="font-size: 1rem; color: #999;">Fermez cet onglet ou fermez l'autre instance pour continuer ici.</p>
-            </div>
-        `;
-        return;
+async function checkSingleInstance(userId) {
+    if (isBlocked) return;
+    
+    try {
+        const sessionRef = doc(db, "sessions", userId);
+        const sessionDoc = await getDoc(sessionRef);
+        
+        if (sessionDoc.exists()) {
+            const data = sessionDoc.data();
+            const now = Date.now();
+            
+            // Si la session existe et est active (moins de 10 secondes)
+            if (data.sessionId !== SESSION_ID && (now - data.lastPing) < 10000) {
+                isBlocked = true;
+                clearInterval(sessionCheckInterval);
+                document.body.innerHTML = `
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #1a1a1a; color: white; text-align: center; padding: 20px;">
+                        <h1 style="color: #ffde00; font-size: 3rem; margin-bottom: 20px;">⚠️ Instance Déjà Ouverte</h1>
+                        <p style="font-size: 1.2rem; margin-bottom: 30px;">Votre compte est déjà connecté ailleurs.</p>
+                        <p style="font-size: 1rem; color: #999;">Fermez l'autre instance pour continuer ici.</p>
+                        <button onclick="location.reload()" style="margin-top: 30px; padding: 15px 30px; background: #ffde00; color: #1a1a1a; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1rem;">Réessayer</button>
+                    </div>
+                `;
+                return false;
+            }
+        }
+        
+        // Mettre à jour notre session
+        await setDoc(sessionRef, {
+            sessionId: SESSION_ID,
+            lastPing: Date.now(),
+            email: auth.currentUser?.email || 'unknown'
+        });
+        
+        return true;
+    } catch (error) {
+        console.warn("Impossible de vérifier l'instance unique:", error.message);
+        // Continuer sans vérification si les permissions manquent
+        return true;
     }
-};
+}
 
-window.addEventListener('beforeunload', () => {
-    bc.close();
-});
+async function startSessionMonitoring(userId) {
+    // Vérification initiale
+    const canContinue = await checkSingleInstance(userId);
+    if (!canContinue) return false;
+    
+    // Vérifier toutes les 3 secondes
+    sessionCheckInterval = setInterval(() => {
+        checkSingleInstance(userId);
+    }, 3000);
+    
+    // Nettoyer la session à la fermeture
+    window.addEventListener('beforeunload', async () => {
+        if (!isBlocked) {
+            try {
+                await setDoc(doc(db, "sessions", userId), {
+                    sessionId: SESSION_ID,
+                    lastPing: 0,
+                    email: auth.currentUser?.email || 'unknown'
+                });
+            } catch (error) {
+                // Ignorer les erreurs lors de la fermeture
+            }
+        }
+    });
+    
+    return true;
+}
 
 // Liste des Générations
 const GEN_LIST = [
@@ -131,6 +174,10 @@ onAuthStateChanged(auth, async (user) => {
     const loader = document.getElementById('global-loader');
     
     if (user) {
+        // Vérifier l'instance unique
+        const canContinue = await startSessionMonitoring(user.uid);
+        if (!canContinue) return;
+        
         // Connecté
         document.getElementById('auth-overlay').style.display = 'none';
         document.getElementById('game-app').style.display = 'block';
