@@ -30,6 +30,8 @@ jobs:
   dependency-check:
     name: Dependency Vulnerability Check
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     
     steps:
       - name: Checkout code
@@ -71,6 +73,8 @@ jobs:
   responsive-design-check:
     name: Responsive Design Validation
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     
     steps:
       - name: Checkout code
@@ -144,6 +148,8 @@ jobs:
   accessibility-check:
     name: Basic Accessibility Check
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     
     steps:
       - name: Checkout code
