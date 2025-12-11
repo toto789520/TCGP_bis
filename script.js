@@ -451,6 +451,7 @@ async function fetchUserCollection(uid) {
             await setDoc(doc(db, "players", uid), {
                 email: auth.currentUser.email,
                 collection: [],
+                packsByGen: {},
                 lastDrawTime: 0,
                 availablePacks: PACKS_PER_COOLDOWN,
                 role: 'player'
@@ -1083,15 +1084,16 @@ async function checkCooldown(uid) {
         const diff = Date.now() - lastDraw;
         const cooldownMs = COOLDOWN_MINUTES * 60 * 1000;
         
-        // Si le cooldown est passé, régénérer TOUS les packs
+        // Si le cooldown est passé ET qu'il n'y a plus de packs, régénérer TOUS les packs
         const wasZero = availablePacks === 0;
-        if (diff >= cooldownMs) {
+        if (availablePacks === 0 && diff >= cooldownMs) {
             availablePacks = PACKS_PER_COOLDOWN;
             
             // Mettre à jour Firebase pour cette génération
+            // Reset lastDrawTime à 0 pour indiquer que les packs sont pleins et prêts
             packsByGen[currentGen] = {
                 availablePacks: PACKS_PER_COOLDOWN,
-                lastDrawTime: genData.lastDrawTime
+                lastDrawTime: 0
             };
             
             await setDoc(doc(db, "players", uid), { 
@@ -1107,7 +1109,23 @@ async function checkCooldown(uid) {
         } else {
             // Calculer le temps restant avant la régénération complète
             const timeToNextPack = cooldownMs - diff;
-            startTimer(timeToNextPack, uid);
+            // S'assurer que le timer n'est jamais négatif
+            if (timeToNextPack > 0) {
+                startTimer(timeToNextPack, uid);
+            } else {
+                // Si le temps est déjà passé mais qu'on arrive ici, forcer la régénération
+                // (Ne devrait normalement pas arriver grâce au check ci-dessus)
+                availablePacks = PACKS_PER_COOLDOWN;
+                packsByGen[currentGen] = {
+                    availablePacks: PACKS_PER_COOLDOWN,
+                    lastDrawTime: 0
+                };
+                await setDoc(doc(db, "players", uid), { 
+                    packsByGen: packsByGen
+                }, { merge: true });
+                updatePacksDisplay(PACKS_PER_COOLDOWN, true);
+                enableBoosterButton(true);
+            }
         }
     } else {
         updatePacksDisplay(PACKS_PER_COOLDOWN);

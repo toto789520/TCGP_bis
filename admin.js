@@ -90,6 +90,7 @@ window.resetCooldown = async (uid, email) => {
     try { 
         await updateDoc(doc(db, "players", uid), { 
             lastDrawTime: 0,
+            packsByGen: {}, // Reset tous les packs de toutes les générations
             adminNotification: {
                 type: 'cooldown_reset',
                 message: '⚡ Votre cooldown a été réinitialisé par un administrateur !',
@@ -105,7 +106,7 @@ window.resetCooldown = async (uid, email) => {
 
 window.resetPlayer = async (uid, email) => {
     if (!confirm(`Vider tout le deck de ${email} ?`)) return;
-    try { await updateDoc(doc(db, "players", uid), { collection: [], lastDrawTime: 0 }); window.showPopup("Succès", "Deck vidé."); loadAllPlayers(); } catch (e) { window.showPopup("Erreur", e.message); }
+    try { await updateDoc(doc(db, "players", uid), { collection: [], lastDrawTime: 0, packsByGen: {} }); window.showPopup("Succès", "Deck vidé."); loadAllPlayers(); } catch (e) { window.showPopup("Erreur", e.message); }
 };
 
 window.deleteAccount = async (uid, email) => {
