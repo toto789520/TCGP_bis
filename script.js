@@ -91,17 +91,18 @@ const DeviceInfo = {
     platform: navigator.platform,
     isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream,
     // iPad detection: combine multiple signals for reliability
+    // Note: Modern iPads may report as MacIntel, so we check maxTouchPoints
     isIPad: /iPad/.test(navigator.userAgent) || 
             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
-            (navigator.userAgentData?.platform === 'macOS' && navigator.maxTouchPoints > 1),
+            (navigator.userAgentData && navigator.userAgentData.platform === 'macOS' && navigator.maxTouchPoints > 1),
     isAndroid: /Android/.test(navigator.userAgent),
     isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
     isSafari: /^((?!chrome|android).)*safari/i.test(navigator.userAgent),
     isChrome: /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor),
     isFirefox: /Firefox/.test(navigator.userAgent),
     isSamsung: /SamsungBrowser/.test(navigator.userAgent),
-    // Problematic browsers detection
-    isInAppBrowser: /FBAN|FBAV|Instagram|Line|Snapchat|Twitter|WeChat/i.test(navigator.userAgent),
+    // Problematic browsers detection (including X/Twitter)
+    isInAppBrowser: /FBAN|FBAV|Instagram|Line|Snapchat|Twitter|X;|WeChat/i.test(navigator.userAgent),
     isCometBrowser: /Comet/i.test(navigator.userAgent),
     
     get isProblematicBrowser() {
@@ -574,19 +575,33 @@ Maximum 2 cartes identiques par pack
 };
 
 // --- AUTHENTIFICATION ---
-// Timeout de sécurité pour le loader
-let authLoadingTimeout = setTimeout(() => {
-    const loader = document.getElementById('global-loader');
-    if (loader && loader.style.display !== 'none') {
-        Logger.error('Timeout du chargement - forçage de l\'affichage');
-        loader.style.display = 'none';
-        // Si pas d'utilisateur après timeout, afficher l'écran de connexion
-        if (!auth.currentUser) {
-            document.getElementById('auth-overlay').style.display = 'flex';
-            window.showPopup("Erreur de chargement", "Le chargement a pris trop de temps. Veuillez vous reconnecter.");
-        }
+// Timeout de sécurité pour le loader - sera initialisé au démarrage
+let authLoadingTimeout = null;
+
+// Démarrer le timeout d'authentification
+function startAuthTimeout() {
+    // Annuler tout timeout existant
+    if (authLoadingTimeout) {
+        clearTimeout(authLoadingTimeout);
     }
-}, AUTH_LOADING_TIMEOUT_MS);
+    
+    authLoadingTimeout = setTimeout(() => {
+        const loader = document.getElementById('global-loader');
+        if (loader && loader.style.display !== 'none') {
+            Logger.error('Timeout du chargement - forçage de l\'affichage');
+            loader.style.display = 'none';
+            // Si pas d'utilisateur après timeout, afficher l'écran de connexion
+            if (!auth.currentUser) {
+                document.getElementById('auth-overlay').style.display = 'flex';
+                window.showPopup("Erreur de chargement", "Le chargement a pris trop de temps. Veuillez vous reconnecter.");
+            }
+        }
+        authLoadingTimeout = null;
+    }, AUTH_LOADING_TIMEOUT_MS);
+}
+
+// Démarrer le timeout au chargement de la page
+startAuthTimeout();
 
 onAuthStateChanged(auth, async (user) => {
     const loader = document.getElementById('global-loader');
@@ -1671,7 +1686,8 @@ function updateBellIcon() {
 window.googleLogin = async () => {
     const authMsg = document.getElementById('auth-msg');
     
-    // Sur iOS/iPad/Safari, utiliser directement redirect car les popups sont souvent bloquées
+    // Sur iOS (iPhone/iPod/old iPads) ou modern iPad ou Safari, utiliser redirect car popups souvent bloquées
+    // Note: isIOS catches old iPads, isIPad catches modern iPads reporting as MacIntel
     const shouldUseRedirect = DeviceInfo.isIOS || DeviceInfo.isIPad || DeviceInfo.isSafari;
     
     try {
