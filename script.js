@@ -85,6 +85,47 @@ window.addEventListener('unhandledrejection', (event) => {
 // Exposer Logger globalement pour debugging
 window.Logger = Logger;
 
+// --- DÉTECTION D'APPAREIL ET NAVIGATEUR ---
+const DeviceInfo = {
+    userAgent: navigator.userAgent,
+    platform: navigator.platform,
+    isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream,
+    isIPad: /iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1),
+    isAndroid: /Android/.test(navigator.userAgent),
+    isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+    isSafari: /^((?!chrome|android).)*safari/i.test(navigator.userAgent),
+    isChrome: /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor),
+    isFirefox: /Firefox/.test(navigator.userAgent),
+    isSamsung: /SamsungBrowser/.test(navigator.userAgent),
+    
+    get info() {
+        return {
+            userAgent: this.userAgent,
+            platform: this.platform,
+            isIOS: this.isIOS,
+            isIPad: this.isIPad,
+            isAndroid: this.isAndroid,
+            isMobile: this.isMobile,
+            isSafari: this.isSafari,
+            isChrome: this.isChrome,
+            isFirefox: this.isFirefox,
+            isSamsung: this.isSamsung,
+            screenWidth: window.screen.width,
+            screenHeight: window.screen.height,
+            viewport: {
+                width: window.innerWidth,
+                height: window.innerHeight
+            }
+        };
+    }
+};
+
+// Logger les infos de l'appareil au chargement
+Logger.info('Appareil détecté', DeviceInfo.info);
+
+// Exposer DeviceInfo globalement pour debugging
+window.DeviceInfo = DeviceInfo;
+
 // --- ENREGISTREMENT SERVICE WORKER (PWA) ---
 let deferredPrompt = null;
 let swRegistration = null;
@@ -168,6 +209,13 @@ const provider = new GoogleAuthProvider();
 provider.setCustomParameters({
     prompt: 'select_account'
 });
+
+// Sur iOS/iPad, utiliser la persistance locale pour éviter les problèmes avec ITP
+if (DeviceInfo.isIOS || DeviceInfo.isIPad) {
+    Logger.info('iOS/iPad détecté - Configuration de la persistance auth');
+    // Note: Firebase 10.x gère automatiquement la persistance
+    // mais on peut forcer des paramètres si nécessaire
+}
 
 // Vérifier les résultats de redirection au chargement
 getRedirectResult(auth)
@@ -328,6 +376,30 @@ let selectedRarityFilter = null; // Filtre de rareté actif
 
 // --- INITIALISATION AU CHARGEMENT DE LA PAGE ---
 window.onload = () => {
+    // Détection de navigateurs problématiques
+    const isInAppBrowser = /FBAN|FBAV|Instagram|Line|Snapchat|Twitter|WeChat/i.test(navigator.userAgent);
+    const isCometBrowser = /Comet/i.test(navigator.userAgent);
+    
+    if (isInAppBrowser || isCometBrowser) {
+        Logger.warn('Navigateur in-app détecté', { 
+            userAgent: navigator.userAgent,
+            isCometBrowser: isCometBrowser 
+        });
+        
+        // Afficher un avertissement pour les utilisateurs
+        const warningHtml = `
+            <div style="background: #ff9800; color: white; padding: 10px; text-align: center; font-size: 0.9rem;">
+                ⚠️ Pour une meilleure expérience, ouvrez ce site dans votre navigateur principal (Safari, Chrome, Firefox).
+            </div>
+        `;
+        
+        const body = document.body;
+        const warningDiv = document.createElement('div');
+        warningDiv.innerHTML = warningHtml;
+        body.insertBefore(warningDiv.firstElementChild, body.firstElementChild);
+    }
+    
+    // Initialiser les options de génération
     const select = document.getElementById('gen-select');
     if(select) {
         // On inverse la liste pour avoir Gen 7 en premier
@@ -1574,11 +1646,21 @@ function updateBellIcon() {
 window.googleLogin = async () => {
     const authMsg = document.getElementById('auth-msg');
     
+    // Sur iOS/iPad/Safari, utiliser directement redirect car les popups sont souvent bloquées
+    const shouldUseRedirect = DeviceInfo.isIOS || DeviceInfo.isIPad || DeviceInfo.isSafari;
+    
     try {
-        Logger.info('Tentative de connexion Google via popup');
         authMsg.innerText = 'Connexion en cours...';
         authMsg.style.color = '#4CAF50';
         
+        if (shouldUseRedirect) {
+            Logger.info('Utilisation de redirect pour iOS/iPad/Safari');
+            await signInWithRedirect(auth, provider);
+            // La page va se recharger, pas besoin de faire quoi que ce soit d'autre
+            return;
+        }
+        
+        Logger.info('Tentative de connexion Google via popup');
         await signInWithPopup(auth, provider);
         Logger.info('Connexion Google via popup réussie');
         authMsg.innerText = '';
