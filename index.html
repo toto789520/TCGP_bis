@@ -69,8 +69,8 @@
             </button>
             <div class="divider">OU</div>
             <form onsubmit="event.preventDefault(); signIn();">
-                <input type="email" id="email" placeholder="Email" autocomplete="username" aria-label="Adresse Email">
-                <input type="password" id="password" placeholder="Mot de passe" autocomplete="current-password" aria-label="Mot de passe">
+                <input type="email" id="email" placeholder="Email" autocomplete="username" aria-label="Adresse Email" required>
+                <input type="password" id="password" placeholder="Mot de passe" autocomplete="current-password" aria-label="Mot de passe" required minlength="6">
                 <div class="btn-group">
                     <button type="submit" class="btn-secondary">Connexion</button>
                     <button type="button" onclick="signUp()" class="btn-primary">Créer</button>
@@ -94,25 +94,41 @@
 
         <div class="action-area">
             
-            <div class="custom-select-wrapper">
-                <label for="gen-select">CHOIX DU CLASSEUR</label>
-                <div class="select-container">
-                    <select id="gen-select" onchange="changeGen()" aria-label="Choisir la génération"></select>
-                    <span class="select-arrow">▼</span>
+            <div class="select-group">
+                <div class="custom-select-wrapper">
+                    <label for="gen-select">CHOIX DU CLASSEUR</label>
+                    <div class="select-container">
+                        <select id="gen-select" onchange="changeGen()" aria-label="Choisir la génération"></select>
+                        <span class="select-arrow">▼</span>
+                    </div>
+                </div>
+                
+                <div class="custom-select-wrapper">
+                    <label for="pack-quantity">NOMBRE DE PACKS</label>
+                    <div class="select-container">
+                        <select id="pack-quantity" onchange="updatePackQuantity()">
+                            <option value="1" selected>1 pack</option>
+                            <option value="2">2 packs</option>
+                            <option value="3">3 packs</option>
+                        </select>
+                        <span class="select-arrow">▼</span>
+                    </div>
                 </div>
             </div>
 
-            <button onclick="drawCard()" id="btn-draw" class="btn-booster" disabled>
-                <div class="booster-content">CHARGEMENT...</div>
-            </button>
+            <div class="pack-controls">
+                <button onclick="drawCard()" id="btn-draw" class="btn-booster" disabled>
+                    <div class="booster-content">CHARGEMENT...</div>
+                </button>
+                
+                <button onclick="showDropRates()" class="btn-info" title="Probabilités de drop">
+                    <span style="font-size: 1.2rem; font-weight: bold;">ℹ️</span>
+                </button>
+            </div>
             
             <div id="packs-available" class="packs-display" style="display:none; margin: 10px 0; font-weight: bold; color: var(--secondary); font-size: 1.1rem;">
                 🎁 Packs disponibles : <span id="packs-count">0</span>/3
             </div>
-            
-            <button onclick="showDropRates()" class="btn-info" title="Probabilités de drop">
-                <span style="font-size: 1.2rem; font-weight: bold;">ℹ️</span>
-            </button>
             
             <div id="cooldown-display" style="display:none;">
                 ⏳ Prochain dans : <span id="timer-val">00:00</span>

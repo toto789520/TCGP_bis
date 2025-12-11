@@ -170,9 +170,10 @@ const GAME_CONFIG = {
         { type: 'ultra_rare', chance: 3.8, filename: 'ultra_rare.json', label: "Ultra Rare", weight: 4 },
         { type: 'secret',     chance: 0.2, filename: 'secret.json', label: "SECRÈTE", weight: 5 }
     ],
-    dropRatesSixthCard: [ // Pour la 6ème carte : ni secrète, ni commune, ni uncommon
-        { type: 'rare',       chance: 70,  filename: 'rare.json', label: "Rare", weight: 3 },
-        { type: 'ultra_rare', chance: 30,  filename: 'ultra_rare.json', label: "Ultra Rare", weight: 4 }
+    dropRatesSixthCard: [ // Pour la 5ème carte : possibilité de secrète mais pas de commune/uncommon
+        { type: 'rare',       chance: 68,  filename: 'rare.json', label: "Rare", weight: 3 },
+        { type: 'ultra_rare', chance: 30,  filename: 'ultra_rare.json', label: "Ultra Rare", weight: 4 },
+        { type: 'secret',     chance: 2,   filename: 'secret.json', label: "SECRÈTE", weight: 5 }
     ],
     // Icônes (Noms simplifiés en minuscules comme demandé)
     icons: {
@@ -192,6 +193,7 @@ let currentGenData = []; // Toutes les cartes possibles de la gen active
 let cooldownInterval = null;
 let tempBoosterCards = []; // Cartes en cours d'ouverture
 let adminShowAllMode = false; // Mode admin pour afficher toutes les cartes
+let selectedRarityFilter = null; // Filtre de rareté actif
 
 // --- INITIALISATION AU CHARGEMENT DE LA PAGE ---
 window.onload = () => {
@@ -227,17 +229,115 @@ window.closePopup = () => {
     if(el) el.style.display = 'none'; 
 };
 
+// --- MENU PROFIL ---
+function showProfileMenu() {
+    const menuHtml = `
+        <div style="display: flex; flex-direction: column; gap: 15px;">
+            <button onclick="logout()" class="btn-popup" style="background: var(--primary);">
+                🚪 Déconnexion
+            </button>
+            <button onclick="resetAccount()" class="btn-popup" style="background: #ff9800;">
+                🔄 Réinitialiser mon compte
+            </button>
+            <button onclick="deleteAccount()" class="btn-popup" style="background: var(--danger);">
+                ❌ Supprimer mon compte
+            </button>
+            <button onclick="closePopup()" class="btn-popup" style="background: #666;">
+                Annuler
+            </button>
+        </div>
+    `;
+    
+    const popup = document.getElementById('custom-popup-overlay');
+    const title = document.getElementById('popup-title');
+    const msg = document.getElementById('popup-msg');
+    
+    title.innerText = "👤 MON PROFIL";
+    msg.innerHTML = menuHtml;
+    popup.style.display = 'flex';
+}
+
+window.resetAccount = async () => {
+    if (!confirm('⚠️ Êtes-vous sûr de vouloir réinitialiser votre compte ? Toutes vos cartes seront supprimées !')) {
+        return;
+    }
+    
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    try {
+        await updateDoc(doc(db, "players", user.uid), {
+            collection: [],
+            packsByGen: {},
+            currentBooster: [],
+            boosterRevealedCards: []
+        });
+        
+        closePopup();
+        window.showPopup("✅ Compte réinitialisé", "Votre compte a été réinitialisé avec succès. Rechargez la page.");
+        setTimeout(() => location.reload(), 2000);
+    } catch (e) {
+        window.showPopup("Erreur", "Impossible de réinitialiser le compte: " + e.message);
+    }
+};
+
+window.deleteAccount = async () => {
+    if (!confirm('⚠️ ATTENTION ! Voulez-vous vraiment SUPPRIMER COMPLÈTEMENT votre compte ? Cette action est IRRÉVERSIBLE !')) {
+        return;
+    }
+    
+    if (!confirm('❌ Dernière confirmation : Supprimer définitivement votre compte ?')) {
+        return;
+    }
+    
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    try {
+        // Supprimer les données Firestore
+        await deleteDoc(doc(db, "players", user.uid));
+        await deleteDoc(doc(db, "sessions", user.uid));
+        
+        // Supprimer le compte Firebase Auth
+        await user.delete();
+        
+        closePopup();
+        window.showPopup("✅ Compte supprimé", "Votre compte a été supprimé avec succès.");
+        setTimeout(() => location.reload(), 2000);
+    } catch (e) {
+        if (e.code === 'auth/requires-recent-login') {
+            window.showPopup("Erreur", "Vous devez vous reconnecter récemment pour supprimer votre compte. Déconnectez-vous et reconnectez-vous, puis réessayez.");
+        } else {
+            window.showPopup("Erreur", "Impossible de supprimer le compte: " + e.message);
+        }
+    }
+};
+
+// --- GESTION QUANTITÉ DE PACKS ---
+window.updatePackQuantity = () => {
+    const select = document.getElementById('pack-quantity');
+    const btn = document.getElementById('btn-draw');
+    const quantity = parseInt(select.value);
+    
+    if (btn && quantity > 1) {
+        btn.innerHTML = `<div class="booster-content">OUVRIR ${quantity} BOOSTERS</div>`;
+    } else if (btn) {
+        btn.innerHTML = '<div class="booster-content">OUVRIR UN BOOSTER</div>';
+    }
+};
+
 // --- AFFICHAGE DES PROBABILITÉS ---
 window.showDropRates = () => {
     const packInfo = `
 <h3>🎁 SYSTÈME DE PACKS :</h3>
-• Vous disposez de 3 packs maximum
+• Vous disposez de 3 packs maximum par génération
 • Les 3 packs se régénèrent toutes les ${COOLDOWN_MINUTES} minutes
-• Vous pouvez ouvrir un pack dès qu'il est disponible
+• Vous pouvez ouvrir plusieurs packs d'un coup
+• Chaque génération a son propre cooldown indépendant
 
 <h3>🎲 TAILLE DU PACK :</h3>
-• 50% de chance d'obtenir 4 cartes
-• 50% de chance d'obtenir 5 cartes
+• 75% de chance d'obtenir 4 cartes
+• 25% de chance d'obtenir 5 cartes
 
 <h3>📊 PROBABILITÉS DE RARETÉ (Cartes 1-4) :</h3>
 • ⚪ Commune : 56%
@@ -247,9 +347,10 @@ window.showDropRates = () => {
 • ⭐ Secrète : 0.2%
 
 <h3>✨ 5ème CARTE (si pack de 5) :</h3>
-• 🔵 Rare : 70%
+• 🔵 Rare : 68%
 • 🟣 Ultra Rare : 30%
-(Pas de commune, peu commune ou secrète)
+• ⭐ Secrète : 2%
+(Pas de commune ou peu commune)
 
 <h3>🚫 LIMITE :</h3>
 Maximum 2 cartes identiques par pack
@@ -277,11 +378,15 @@ onAuthStateChanged(auth, async (user) => {
         const adminPreview = document.getElementById('admin-preview-container');
         if(adminPreview) adminPreview.style.display = isAdmin ? 'block' : 'none';
         
-        // Redirection admin au clic sur le profil
+        // Menu profil au clic sur le profil
         const userProfilePill = document.getElementById('user-profile-pill');
         if(userProfilePill) {
             userProfilePill.onclick = () => {
-                if(isAdmin) window.location.href = 'admin.html';
+                if(isAdmin) {
+                    window.location.href = 'admin.html';
+                } else {
+                    showProfileMenu();
+                }
             };
         }
 
@@ -367,6 +472,12 @@ window.changeGen = async () => {
 
     currentGenData = []; // Reset des données locales
     
+    // Vérifier le cooldown de cette génération
+    const user = auth.currentUser;
+    if (user && user.email !== ADMIN_EMAIL) {
+        await checkCooldown(user.uid);
+    }
+    
     // On charge tous les JSONs de la génération
     for (const rate of GAME_CONFIG.dropRates) {
         try {
@@ -419,6 +530,9 @@ function renderBinder() {
     const filteredCards = cardsWithOwned.filter(cardRef => {
         // Filtre recherche
         if(searchTerm && !cardRef.name.toLowerCase().includes(searchTerm)) return false;
+        
+        // Filtre par rareté sélectionnée
+        if(selectedRarityFilter && cardRef.rarityKey !== selectedRarityFilter) return false;
         
         // Filtre possédée/manquante
         const isOwned = cardRef.ownedCopies > 0;
@@ -481,19 +595,44 @@ function renderBinder() {
             secret: { emoji: '⭐', name: 'Secrètes' }
         };
         
-        statsContainer.innerHTML = Object.entries(rarityStats)
+        // Calculer le total global
+        let totalOwned = 0;
+        let totalCards = 0;
+        Object.values(rarityStats).forEach(stats => {
+            totalOwned += stats.owned;
+            totalCards += stats.total;
+        });
+        const globalPercent = totalCards > 0 ? Math.round((totalOwned / totalCards) * 100) : 0;
+        
+        // Badge global en premier
+        let badgesHtml = `<div class="rarity-stat-badge ${totalOwned === totalCards ? 'complete' : 'incomplete'}" 
+            onclick="toggleRarityFilter(null)" 
+            style="cursor: pointer; ${selectedRarityFilter === null ? 'box-shadow: 0 0 15px rgba(255, 222, 0, 0.8); transform: scale(1.05);' : ''}">
+            <span class="emoji">🎯</span>
+            <span>TOTAL: ${totalOwned}/${totalCards}</span>
+            <span class="percent">(${globalPercent}%)</span>
+        </div>`;
+        
+        // Badges par rareté
+        badgesHtml += Object.entries(rarityStats)
             .filter(([_, stats]) => stats.total > 0)
             .map(([rarity, stats]) => {
                 const label = labels[rarity];
                 const percent = Math.round((stats.owned / stats.total) * 100);
                 const isComplete = stats.owned === stats.total;
-                return `<div class="rarity-stat-badge ${isComplete ? 'complete' : 'incomplete'}">
+                const isSelected = selectedRarityFilter === rarity;
+                return `<div class="rarity-stat-badge ${isComplete ? 'complete' : 'incomplete'}" 
+                    onclick="toggleRarityFilter('${rarity}')" 
+                    style="cursor: pointer; ${isSelected ? 'box-shadow: 0 0 15px rgba(255, 222, 0, 0.8); transform: scale(1.05);' : ''}" 
+                    title="Cliquez pour filtrer">
                     <span class="emoji">${label.emoji}</span>
                     <span>${label.name}: ${stats.owned}/${stats.total}</span>
                     <span class="percent">(${percent}%)</span>
                 </div>`;
             })
             .join('');
+            
+        statsContainer.innerHTML = badgesHtml;
     }
     
     // Message si aucun résultat
@@ -534,6 +673,17 @@ function renderBinder() {
 
 // Fonction appelée par la barre de recherche
 window.filterBinder = () => {
+    renderBinder();
+};
+
+// Fonction pour filtrer par rareté
+window.toggleRarityFilter = (rarity) => {
+    if (selectedRarityFilter === rarity) {
+        // Si on clique sur le même filtre, on le désactive
+        selectedRarityFilter = null;
+    } else {
+        selectedRarityFilter = rarity;
+    }
     renderBinder();
 };
 
@@ -624,66 +774,90 @@ window.drawCard = async () => {
 
     const genSelect = document.getElementById('gen-select');
     const selectedGen = genSelect.value;
+    
+    // Récupérer la quantité de packs à ouvrir
+    const packQuantitySelect = document.getElementById('pack-quantity');
+    const packQuantity = parseInt(packQuantitySelect.value);
+    
+    // Vérifier si l'utilisateur a assez de packs disponibles
+    if (!isAdmin) {
+        const snap = await getDoc(doc(db, "players", user.uid));
+        if (snap.exists()) {
+            const packsByGen = snap.data().packsByGen || {};
+            const genData = packsByGen[selectedGen] || { availablePacks: PACKS_PER_COOLDOWN };
+            const availablePacks = genData.availablePacks ?? PACKS_PER_COOLDOWN;
+            
+            if (availablePacks < packQuantity) {
+                window.showPopup("Pas assez de packs", `Vous voulez ouvrir ${packQuantity} pack(s) mais vous n'en avez que ${availablePacks} disponible(s) pour cette génération.`);
+                return;
+            }
+        }
+    }
 
     btn.disabled = true;
     btn.innerHTML = "Génération...";
 
     try {
         tempBoosterCards = [];
-        // 50% de chance d'avoir 4 ou 5 cartes
-        const packSize = Math.random() < 0.5 ? 4 : 5;
+        
+        // Ouvrir plusieurs packs
+        for (let packIndex = 0; packIndex < packQuantity; packIndex++) {
+            // 25% de chance d'avoir 5 cartes, 75% pour 4 cartes
+            const packSize = Math.random() < 0.25 ? 5 : 4;
 
-        for(let i=0; i<packSize; i++) {
-            const rand = Math.random() * 100;
-            let rarityConfig = GAME_CONFIG.dropRates[0];
-            let acc = 0;
-            
-            // La 5ème carte (index 4) utilise des taux spéciaux
-            const rates = (i === 4) ? GAME_CONFIG.dropRatesSixthCard : GAME_CONFIG.dropRates;
-            
-            for (const r of rates) {
-                acc += r.chance;
-                if (rand <= acc) { rarityConfig = r; break; }
-            }
-
-            // Fetch du fichier correspondant
-            const res = await fetch(`data/${selectedGen}/${rarityConfig.filename}`);
-            if(!res.ok) {
-                // Si pas de fichier (ex: pas de secrète), on prend une commune
-                const fallback = await fetch(`data/${selectedGen}/common.json`);
-                var list = await fallback.json();
-                rarityConfig = GAME_CONFIG.dropRates[0];
-            } else {
-                var list = await res.json();
-                // Si le fichier est vide []
-                if(!list || list.length === 0) {
-                    const fallback = await fetch(`data/${selectedGen}/common.json`);
-                    list = await fallback.json();
-                    rarityConfig = GAME_CONFIG.dropRates[0];
+            for(let i=0; i<packSize; i++) {
+                const rand = Math.random() * 100;
+                let rarityConfig = GAME_CONFIG.dropRates[0];
+                let acc = 0;
+                
+                // La 5ème carte (index 4) utilise des taux spéciaux
+                const rates = (i === 4) ? GAME_CONFIG.dropRatesSixthCard : GAME_CONFIG.dropRates;
+                
+                for (const r of rates) {
+                    acc += r.chance;
+                    if (rand <= acc) { rarityConfig = r; break; }
                 }
-            }
 
-            // Pioche avec limitation à 2 cartes identiques max
-            let card;
-            let attempts = 0;
-            const maxAttempts = 50;
-            
-            do {
-                card = list[Math.floor(Math.random() * list.length)];
-                const sameCardCount = tempBoosterCards.filter(c => c.id === card.id).length;
+                // Fetch du fichier correspondant
+                const res = await fetch(`data/${selectedGen}/${rarityConfig.filename}`);
+                if(!res.ok) {
+                    // Si pas de fichier (ex: pas de secrète), on prend une commune
+                    const fallback = await fetch(`data/${selectedGen}/common.json`);
+                    var list = await fallback.json();
+                    rarityConfig = GAME_CONFIG.dropRates[0];
+                } else {
+                    var list = await res.json();
+                    // Si le fichier est vide []
+                    if(!list || list.length === 0) {
+                        const fallback = await fetch(`data/${selectedGen}/common.json`);
+                        list = await fallback.json();
+                        rarityConfig = GAME_CONFIG.dropRates[0];
+                    }
+                }
+
+                // Pioche avec limitation à 2 cartes identiques max par pack
+                let card;
+                let attempts = 0;
+                const maxAttempts = 50;
                 
-                // Si on a déjà 2 fois cette carte, on en cherche une autre
-                if (sameCardCount < 2) break;
+                do {
+                    card = list[Math.floor(Math.random() * list.length)];
+                    const sameCardCount = tempBoosterCards.filter(c => c.id === card.id).length;
+                    
+                    // Si on a déjà 2 fois cette carte, on en cherche une autre
+                    if (sameCardCount < 2) break;
+                    
+                    attempts++;
+                } while (attempts < maxAttempts);
                 
-                attempts++;
-            } while (attempts < maxAttempts);
-            
-            // Construction de l'objet sauvegardé
-            card.acquiredAt = Date.now();
-            card.rarityKey = rarityConfig.type;
-            card.generation = selectedGen;
-            
-            tempBoosterCards.push(card);
+                // Construction de l'objet sauvegardé
+                card.acquiredAt = Date.now();
+                card.rarityKey = rarityConfig.type;
+                card.generation = selectedGen;
+                card.isFifthCard = (i === 4); // Marquer la 5ème carte
+                
+                tempBoosterCards.push(card);
+            }
         }
 
         // Animation d'ouverture
@@ -697,13 +871,21 @@ window.drawCard = async () => {
         };
         
         if (!isAdmin) {
-            // Décrémenter les packs disponibles
+            // Décrémenter les packs disponibles pour cette génération
             const snap = await getDoc(doc(db, "players", user.uid));
-            let availablePacks = snap.exists() ? (snap.data().availablePacks ?? PACKS_PER_COOLDOWN) : PACKS_PER_COOLDOWN;
-            availablePacks = Math.max(0, availablePacks - 1);
+            const data = snap.exists() ? snap.data() : {};
+            const packsByGen = data.packsByGen || {};
+            const genData = packsByGen[selectedGen] || { availablePacks: PACKS_PER_COOLDOWN, lastDrawTime: 0 };
             
-            updateData.availablePacks = availablePacks;
-            updateData.lastDrawTime = Date.now();
+            let availablePacks = genData.availablePacks ?? PACKS_PER_COOLDOWN;
+            availablePacks = Math.max(0, availablePacks - packQuantity);
+            
+            packsByGen[selectedGen] = {
+                availablePacks: availablePacks,
+                lastDrawTime: Date.now()
+            };
+            
+            updateData.packsByGen = packsByGen;
             
             // Mettre à jour l'affichage
             updatePacksDisplay(availablePacks);
@@ -717,12 +899,16 @@ window.drawCard = async () => {
 
         // Gestion Timer
         if (!isAdmin) {
-            // Si plus de packs disponibles, démarrer le timer
+            // Si plus de packs disponibles pour cette génération, démarrer le timer
             const snap = await getDoc(doc(db, "players", user.uid));
-            const availablePacks = snap.exists() ? (snap.data().availablePacks ?? 0) : 0;
-            
-            if (availablePacks === 0) {
-                startTimer(COOLDOWN_MINUTES * 60 * 1000, user.uid);
+            if (snap.exists()) {
+                const packsByGen = snap.data().packsByGen || {};
+                const genData = packsByGen[selectedGen] || { availablePacks: 0 };
+                const availablePacks = genData.availablePacks ?? 0;
+                
+                if (availablePacks === 0) {
+                    startTimer(COOLDOWN_MINUTES * 60 * 1000, user.uid);
+                }
             }
         } else { 
             // Reset bouton pour l'admin (attendra la fermeture du booster)
@@ -744,12 +930,23 @@ function openBoosterVisual(alreadyRevealed = []) {
     container.innerHTML = '';
     closeBtn.style.display = 'none';
     overlay.style.display = 'flex';
+    
+    // Bloquer le scroll de la page en arrière-plan
+    document.body.classList.add('booster-active');
 
     let cardsRevealed = alreadyRevealed.length;
 
     tempBoosterCards.forEach((card, index) => {
         const flipCard = document.createElement('div');
         flipCard.className = 'flip-card';
+        // Marquer visuellement la 5ème carte
+        if (card.isFifthCard) {
+            flipCard.classList.add('fifth-card-special');
+        }
+        // Marquer les cartes secrètes pour l'effet de glow au hover
+        if (card.rarityKey === 'secret') {
+            flipCard.classList.add('secret-card');
+        }
         // Petit délai pour l'effet de distribution
         flipCard.style.animationDelay = `${index * 0.1}s`;
 
@@ -818,6 +1015,10 @@ function openBoosterVisual(alreadyRevealed = []) {
 
 window.closeBooster = async () => {
     document.getElementById('booster-overlay').style.display = 'none';
+    
+    // Réactiver le scroll de la page
+    document.body.classList.remove('booster-active');
+    
     const btn = document.getElementById('btn-draw');
     
     // Nettoyer les données de booster en cours dans Firestore
@@ -852,12 +1053,19 @@ window.closeBooster = async () => {
     renderBinder();
 };
 
-// --- COOLDOWN ---
+// --- COOLDOWN PAR GÉNÉRATION ---
 async function checkCooldown(uid) {
+    const genSelect = document.getElementById('gen-select');
+    const currentGen = genSelect ? genSelect.value : 'gen7';
+    
     const snap = await getDoc(doc(db, "players", uid));
     if (snap.exists()) {
-        const lastDraw = snap.data().lastDrawTime || 0;
-        let availablePacks = snap.data().availablePacks ?? PACKS_PER_COOLDOWN;
+        const data = snap.data();
+        const packsByGen = data.packsByGen || {};
+        const genData = packsByGen[currentGen] || { availablePacks: PACKS_PER_COOLDOWN, lastDrawTime: 0 };
+        
+        let availablePacks = genData.availablePacks ?? PACKS_PER_COOLDOWN;
+        const lastDraw = genData.lastDrawTime || 0;
         
         const diff = Date.now() - lastDraw;
         const cooldownMs = COOLDOWN_MINUTES * 60 * 1000;
@@ -867,9 +1075,14 @@ async function checkCooldown(uid) {
         if (diff >= cooldownMs) {
             availablePacks = PACKS_PER_COOLDOWN;
             
-            // Mettre à jour Firebase
+            // Mettre à jour Firebase pour cette génération
+            packsByGen[currentGen] = {
+                availablePacks: PACKS_PER_COOLDOWN,
+                lastDrawTime: genData.lastDrawTime
+            };
+            
             await updateDoc(doc(db, "players", uid), { 
-                availablePacks: PACKS_PER_COOLDOWN
+                packsByGen: packsByGen
             });
         }
         
@@ -975,7 +1188,90 @@ window.googleLogin = async () => {
         console.warn("Popup error:", e);
     }
 };
-window.signUp = async () => { authUser(createUserWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('password').value)); };
-window.signIn = async () => { try { await signInWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('password').value); } catch(e) { window.showPopup("Erreur", e.message); } };
+window.signUp = async () => {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const authMsg = document.getElementById('auth-msg');
+    
+    if (!email || !password) {
+        authMsg.innerText = '⚠️ Veuillez remplir tous les champs';
+        return;
+    }
+    
+    if (password.length < 6) {
+        authMsg.innerText = '⚠️ Le mot de passe doit contenir au moins 6 caractères';
+        return;
+    }
+    
+    authMsg.innerText = 'Création du compte...';
+    authMsg.style.color = '#4CAF50';
+    
+    try {
+        await authUser(createUserWithEmailAndPassword(auth, email, password));
+        authMsg.innerText = '';
+    } catch(e) {
+        authMsg.style.color = '#ff6b6b';
+        if (e.code === 'auth/email-already-in-use') {
+            authMsg.innerText = '⚠️ Cette adresse email est déjà utilisée';
+        } else if (e.code === 'auth/invalid-email') {
+            authMsg.innerText = '⚠️ Adresse email invalide';
+        } else if (e.code === 'auth/weak-password') {
+            authMsg.innerText = '⚠️ Mot de passe trop faible';
+        } else {
+            authMsg.innerText = '⚠️ Erreur : ' + e.message;
+        }
+    }
+};
+
+window.signIn = async () => {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const authMsg = document.getElementById('auth-msg');
+    
+    if (!email || !password) {
+        authMsg.innerText = '⚠️ Veuillez remplir tous les champs';
+        return;
+    }
+    
+    authMsg.innerText = 'Connexion...';
+    authMsg.style.color = '#4CAF50';
+    
+    try {
+        await signInWithEmailAndPassword(auth, email, password);
+        authMsg.innerText = '';
+    } catch(e) {
+        authMsg.style.color = '#ff6b6b';
+        if (e.code === 'auth/user-not-found') {
+            authMsg.innerText = '⚠️ Aucun compte trouvé avec cet email';
+        } else if (e.code === 'auth/wrong-password') {
+            authMsg.innerText = '⚠️ Mot de passe incorrect';
+        } else if (e.code === 'auth/invalid-email') {
+            authMsg.innerText = '⚠️ Adresse email invalide';
+        } else if (e.code === 'auth/invalid-credential') {
+            authMsg.innerText = '⚠️ Email ou mot de passe incorrect';
+        } else {
+            authMsg.innerText = '⚠️ Erreur : ' + e.message;
+        }
+    }
+};
 window.logout = () => signOut(auth);
-async function authUser(promise) { try { const res = await promise; const ref = doc(db, "players", res.user.uid); const snap = await getDoc(ref); if (!snap.exists()) await setDoc(ref, { email: res.user.email, collection: [], lastDrawTime: 0, availablePacks: PACKS_PER_COOLDOWN }); } catch (e) { console.error(e); } }
+
+async function authUser(promise) {
+    try {
+        const res = await promise;
+        const ref = doc(db, "players", res.user.uid);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) {
+            await setDoc(ref, {
+                email: res.user.email,
+                collection: [],
+                packsByGen: {},
+                lastDrawTime: 0,
+                availablePacks: PACKS_PER_COOLDOWN
+            });
+        }
+    } catch (e) {
+        console.error('Auth error:', e);
+        throw e; // Propager l'erreur pour qu'elle soit gérée par signUp
+    }
+}
