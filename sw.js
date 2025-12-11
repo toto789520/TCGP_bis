@@ -116,3 +116,57 @@ self.addEventListener('fetch', event => {
       })
   );
 });
+
+// Gestion des clics sur les notifications
+self.addEventListener('notificationclick', event => {
+  swLog('info', 'Notification cliquée: ' + event.notification.tag);
+  
+  event.notification.close();
+  
+  // Ouvrir ou focus l'application
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then(clientList => {
+        // Si une fenêtre est déjà ouverte, la focus
+        for (let i = 0; i < clientList.length; i++) {
+          const client = clientList[i];
+          if (client.url.includes(self.registration.scope) && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        // Sinon, ouvrir une nouvelle fenêtre
+        if (clients.openWindow) {
+          const urlToOpen = event.notification.data?.url || '/';
+          return clients.openWindow(urlToOpen);
+        }
+      })
+  );
+});
+
+// Gestion des notifications push (pour Firebase Cloud Messaging)
+self.addEventListener('push', event => {
+  swLog('info', 'Push notification reçue');
+  
+  let data = {};
+  
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    swLog('warn', 'Erreur lors du parsing de la notification push', e);
+  }
+  
+  const title = data.title || 'Poké-TCG';
+  const options = {
+    body: data.body || 'Vous avez une nouvelle notification',
+    icon: data.icon || 'favicon.ico',
+    badge: 'favicon.ico',
+    tag: data.tag || 'default',
+    requireInteraction: false,
+    vibrate: [200, 100, 200],
+    data: data
+  };
+  
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  );
+});
