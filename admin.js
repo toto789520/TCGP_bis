@@ -17,7 +17,8 @@ const db = getFirestore(app);
 
 window.showPopup = (title, msg) => {
     document.getElementById('popup-title').innerText = title;
-    document.getElementById('popup-msg').innerText = msg;
+    const msgEl = document.getElementById('popup-content') || document.getElementById('popup-msg');
+    msgEl.innerText = msg;
     document.getElementById('custom-popup-overlay').style.display = 'flex';
 };
 window.closePopup = () => { document.getElementById('custom-popup-overlay').style.display = 'none'; };
@@ -48,23 +49,36 @@ window.loadAllPlayers = async () => {
         
         querySnapshot.forEach((docSnap) => {
             const data = docSnap.data();
-            const lastDraw = data.lastDrawTime ? new Date(data.lastDrawTime).toLocaleTimeString() : "Dispo";
             const role = data.role || 'player';
-            const roleColor = role === 'admin' ? '#ffd700' : '#ccc';
-            const roleIcon = role === 'admin' ? '👑' : '👤';
+            let roleColor = '#ccc';
+            let roleIcon = '👤';
+            if (role === 'admin') {
+                roleColor = '#ffd700';
+                roleIcon = '👑';
+            } else if (role === 'vip') {
+                roleColor = '#00e676';
+                roleIcon = '💎';
+            }
 
             const tr = document.createElement('tr');
+            let actions = `
+                <button onclick="resetCooldown('${docSnap.id}', '${data.email}')" class="btn-action btn-cooldown">⏳ Reset</button>
+                <button onclick="resetPlayer('${docSnap.id}', '${data.email}')" class="btn-action btn-reset">⚠️ Deck</button>
+                <button onclick="deleteAccount('${docSnap.id}', '${data.email}')" class="btn-action btn-delete">❌ DEL</button>
+            `;
+            // Afficher le bouton rôle seulement si ce n'est pas un admin
+            if (role !== 'admin') {
+                let roleButtonEmoji = role === 'vip' ? '⬇️' : '⬆️';
+                let roleButtonLabel = role === 'vip' ? 'Rétrograder' : 'VIP';
+                actions = `<button onclick="toggleRole('${docSnap.id}', '${role}')" class="btn-action btn-role" style="background:#8e44ad">${roleButtonEmoji} ${roleButtonLabel}</button>` + actions;
+            }
             tr.innerHTML = `
                 <td><strong>${data.email}</strong></td>
                 <td style="color:${roleColor}; font-weight:bold;">${roleIcon} ${role.toUpperCase()}</td>
                 <td><span class="user-pill">🃏 ${data.collection ? data.collection.length : 0}</span></td>
-                <td>${lastDraw}</td>
                 <td>
                     <div>
-                        <button onclick="toggleRole('${docSnap.id}', '${role}')" class="btn-action btn-role" style="background:#8e44ad">⬆️ Rôle</button>
-                        <button onclick="resetCooldown('${docSnap.id}', '${data.email}')" class="btn-action btn-cooldown">⏳ Reset</button>
-                        <button onclick="resetPlayer('${docSnap.id}', '${data.email}')" class="btn-action btn-reset">⚠️ Deck</button>
-                        <button onclick="deleteAccount('${docSnap.id}', '${data.email}')" class="btn-action btn-delete">❌ DEL</button>
+                        ${actions}
                     </div>
                 </td>`;
             list.appendChild(tr);
@@ -74,7 +88,10 @@ window.loadAllPlayers = async () => {
 
 // CHANGER LE RÔLE (ADMIN <-> PLAYER)
 window.toggleRole = async (uid, currentRole) => {
-    const newRole = currentRole === 'admin' ? 'player' : 'admin';
+    // Ne jamais changer le rôle d'un admin ici
+    if (currentRole === 'admin') return;
+    let newRole = 'vip';
+    if (currentRole === 'vip') newRole = 'player';
     if (!confirm(`Passer cet utilisateur en ${newRole.toUpperCase()} ?`)) return;
 
     try {
@@ -87,16 +104,33 @@ window.toggleRole = async (uid, currentRole) => {
 };
 
 window.resetCooldown = async (uid, email) => {
-    try { 
-        await updateDoc(doc(db, "players", uid), { 
+    try {
+        // Reset cooldowns pour toutes les générations
+        const packsByGen = {};
+        for (let i = 1; i <= 7; i++) {
+            packsByGen[`gen${i}`] = {
+                availablePacks: 3,
+                lastDrawTime: 0,
+                points: 0,
+                bonusPacks: 0
+            };
+        }
+        packsByGen['special_bryan'] = {
+            availablePacks: 3,
             lastDrawTime: 0,
+            points: 0,
+            bonusPacks: 0
+        };
+        
+        await updateDoc(doc(db, "players", uid), { 
+            packsByGen: packsByGen,
             adminNotification: {
                 type: 'cooldown_reset',
-                message: '⚡ Votre cooldown a été réinitialisé par un administrateur !',
+                message: '⚡ Tous vos cooldowns ont été réinitialisés par un administrateur !',
                 timestamp: Date.now()
             }
         }); 
-        window.showPopup("Succès", `Timer reset pour ${email}`); 
+        window.showPopup("Succès", `Tous les cooldowns reset pour ${email}`); 
         loadAllPlayers(); 
     } catch (e) { 
         window.showPopup("Erreur", e.message); 

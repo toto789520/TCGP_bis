@@ -46,7 +46,6 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
@@ -58,11 +57,10 @@
     <div id="booster-overlay" style="display:none;">
         <h2 class="opening-title">CLIQUEZ POUR RÉVÉLER !</h2>
         <div class="booster-actions">
-            <button id="reveal-all-btn" onclick="revealAllCards()" class="btn-action">👁️ Tout Révéler</button>
-            <button id="screenshot-btn" onclick="screenshotBooster()" class="btn-action" style="display:none;">📸 Capturer</button>
+            <button id="reveal-all-btn" onclick="revealAllCards()" class="btn-secondary">👁️ Tout Révéler</button>
         </div>
         <div id="booster-cards-container"></div>
-        <button id="close-booster-btn" onclick="closeBooster()" style="display:none;">AJOUTER À LA COLLECTION</button>
+        <button id="close-booster-btn" onclick="closeBooster()" class="btn-primary" style="display:none;">AJOUTER À LA COLLECTION</button>
     </div>
 
     <div id="auth-overlay" style="display:none;">
@@ -90,9 +88,8 @@
             <div class="nav-logo">TCG <span class="version">Binder</span></div>
             <div class="player-stats">
                 <button id="install-pwa-btn" class="btn-install-pwa" onclick="installPWA()" style="display: none;" title="Installer l'application">📱 Installer</button>
-                <span id="notif-bell" class="notification-bell" onclick="requestNotification()" title="Activer les notifications">🔔</span>
                 <span class="user-pill" id="user-profile-pill" style="cursor: pointer;">👤 <span id="user-display">...</span></span>
-                <span class="user-pill">🃏 <span id="card-count">0</span></span>
+                <span class="user-pill" title="Nombre total de cartes (tous packs confondus)">🃏 <span id="card-count">0</span></span>
                 <button onclick="logout()" class="btn-logout">Sortir</button>
             </div>
         </nav>
@@ -109,7 +106,7 @@
                 </div>
                 
                 <div class="custom-select-wrapper">
-                    <label for="pack-quantity">NOMBRE DE PACKS</label>
+                    <label for="pack-quantity">NOMBRE DE PACKS <span id="packs-info" style="color: var(--secondary); font-size: 0.85em;"></span></label>
                     <div class="select-container">
                         <select id="pack-quantity" onchange="updatePackQuantity()">
                             <option value="1" selected>1 pack</option>
@@ -129,6 +126,22 @@
                 <button onclick="showDropRates()" class="btn-info" title="Probabilités de drop">
                     <span style="font-size: 1.2rem; font-weight: bold;">ℹ️</span>
                 </button>
+            </div>
+            
+            <!-- Barre de progression des points -->
+            <div id="points-progress-container" class="points-progress-container">
+                <div class="points-progress-header">
+                    <span class="points-label">⭐ Progression vers un booster bonus</span>
+                    <span class="points-value" id="points-value">0/20</span>
+                </div>
+                <div class="points-progress-bar">
+                    <div class="points-progress-fill" id="points-progress-fill" style="width: 0%;"></div>
+                </div>
+                <div id="bonus-packs-info" class="bonus-packs-info" style="display: none;">
+                    <button onclick="useBonusPack()" class="btn-primary" style="width: 100%; margin-top: 10px;">
+                        🎁 Utiliser un booster bonus (<span id="bonus-packs-count">0</span> disponible<span id="bonus-plural">s</span>)
+                    </button>
+                </div>
             </div>
             
             <div id="packs-available" class="packs-display" style="display:none; margin: 10px 0; font-weight: bold; color: var(--secondary); font-size: 1.1rem;">
@@ -185,8 +198,8 @@
     <div id="custom-popup-overlay" style="display: none;">
         <div class="popup-box">
             <div id="popup-title" class="popup-title">INFO</div>
-            <div id="popup-msg" class="popup-msg">...</div>
-            <button onclick="closePopup()" class="btn-popup">OK</button>
+            <div id="popup-content" class="popup-content">...</div>
+            <button onclick="closePopup()" class="btn-primary">OK</button>
         </div>
     </div>
 

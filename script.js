@@ -57,8 +57,11 @@ window.addEventListener('appinstalled', () => {
 
 // --- 1. CONFIGURATION ---
 const ADMIN_EMAIL = "bryan.drouet24@gmail.com"; 
-const COOLDOWN_MINUTES = 3;
-const PACKS_PER_COOLDOWN = 3; 
+const COOLDOWN_MINUTES = 7;
+const PACKS_PER_COOLDOWN = 3;
+const POINTS_PER_CARD = 1;
+const POINTS_FOR_BONUS_PACK = 30;
+const BOOSTER_DELAY_SECONDS = 3; 
 
 // TA CONFIG FIREBASE (Celle que tu m'as donnée)
 const firebaseConfig = {
@@ -81,77 +84,12 @@ let sessionCheckInterval = null;
 let isBlocked = false;
 
 async function checkSingleInstance(userId) {
-    if (isBlocked) return;
-    
-    try {
-        const sessionRef = doc(db, "sessions", userId);
-        const sessionDoc = await getDoc(sessionRef);
-        
-        if (sessionDoc.exists()) {
-            const data = sessionDoc.data();
-            const now = Date.now();
-            
-            // Si la session existe et est active (moins de 5 secondes pour éviter les faux positifs)
-            if (data.sessionId !== SESSION_ID && (now - data.lastPing) < 5000) {
-                isBlocked = true;
-                clearInterval(sessionCheckInterval);
-                document.body.innerHTML = `
-                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #1a1a1a; color: white; text-align: center; padding: 20px;">
-                        <h1 style="color: #ffde00; font-size: 3rem; margin-bottom: 20px;">⚠️ Instance Déjà Ouverte</h1>
-                        <p style="font-size: 1.2rem; margin-bottom: 30px;">Votre compte est déjà connecté ailleurs.</p>
-                        <p style="font-size: 1rem; color: #999;">Fermez l'autre instance pour continuer ici.</p>
-                        <button onclick="location.reload()" style="margin-top: 30px; padding: 15px 30px; background: #ffde00; color: #1a1a1a; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1rem;">Réessayer</button>
-                        <div style="margin-top: 40px; padding: 20px; background: rgba(255,255,255,0.1); border-radius: 8px; max-width: 500px;">
-                            <p style="font-size: 0.9rem; color: #ccc; margin-bottom: 15px;">⚙️ <strong>Si le problème persiste :</strong></p>
-                            <button onclick="localStorage.clear(); sessionStorage.clear(); location.reload();" style="padding: 12px 25px; background: #e74c3c; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.95rem;">Effacer les cookies et recharger (F5)</button>
-                            <p style="font-size: 0.8rem; color: #888; margin-top: 10px;">Ceci va vous déconnecter et nettoyer les données locales.</p>
-                        </div>
-                    </div>
-                `;
-                return false;
-            }
-        }
-        
-        // Mettre à jour notre session
-        await setDoc(sessionRef, {
-            sessionId: SESSION_ID,
-            lastPing: Date.now(),
-            email: auth.currentUser?.email || 'unknown'
-        });
-        
-        return true;
-    } catch (error) {
-        console.warn("Impossible de vérifier l'instance unique:", error.message);
-        // Continuer sans vérification si les permissions manquent
-        return true;
-    }
+    // Désactivé pour éviter les erreurs de permissions
+    return true;
 }
 
 async function startSessionMonitoring(userId) {
-    // Vérification initiale
-    const canContinue = await checkSingleInstance(userId);
-    if (!canContinue) return false;
-    
-    // Vérifier toutes les 3 secondes
-    sessionCheckInterval = setInterval(() => {
-        checkSingleInstance(userId);
-    }, 3000);
-    
-    // Nettoyer la session à la fermeture
-    window.addEventListener('beforeunload', async () => {
-        if (!isBlocked) {
-            try {
-                await setDoc(doc(db, "sessions", userId), {
-                    sessionId: SESSION_ID,
-                    lastPing: 0,
-                    email: auth.currentUser?.email || 'unknown'
-                });
-            } catch (error) {
-                // Ignorer les erreurs lors de la fermeture
-            }
-        }
-    });
-    
+    // Désactivé pour éviter les erreurs de permissions
     return true;
 }
 
@@ -220,7 +158,8 @@ window.showPopup = (title, msg) => {
     if(el) {
         document.getElementById('popup-title').innerText = title;
         // Utiliser innerHTML pour supporter le formatage HTML
-        const msgEl = document.getElementById('popup-msg');
+        // Utiliser popup-content si disponible, sinon popup-msg pour compatibilité
+        const msgEl = document.getElementById('popup-content') || document.getElementById('popup-msg');
         msgEl.innerHTML = msg.replace(/\n/g, '<br>');
         msgEl.style.textAlign = 'left';
         msgEl.style.whiteSpace = 'pre-line';
@@ -238,24 +177,18 @@ window.closePopup = () => {
 function showProfileMenu() {
     const menuHtml = `
         <div style="display: flex; flex-direction: column; gap: 15px;">
-            <button onclick="logout()" class="btn-popup" style="background: var(--primary);">
-                🚪 Déconnexion
+            <button onclick="logout()" class="btn-secondary" style="width: 100%;">🚪 Déconnexion
             </button>
-            <button onclick="resetAccount()" class="btn-popup" style="background: #ff9800;">
-                🔄 Réinitialiser mon compte
+            <button onclick="resetAccount()" class="btn-secondary" style="width: 100%;">🔄 Réinitialiser mon compte
             </button>
-            <button onclick="deleteAccount()" class="btn-popup" style="background: var(--danger);">
-                ❌ Supprimer mon compte
-            </button>
-            <button onclick="closePopup()" class="btn-popup" style="background: #666;">
-                Annuler
+            <button onclick="deleteAccount()" class="btn-tertiary" style="width: 100%; background: var(--danger); border-color: #a82929; box-shadow: 0 4px 0 #a82929;">❌ Supprimer mon compte
             </button>
         </div>
     `;
     
     const popup = document.getElementById('custom-popup-overlay');
     const title = document.getElementById('popup-title');
-    const msg = document.getElementById('popup-msg');
+    const msg = document.getElementById('popup-content') || document.getElementById('popup-msg');
     
     title.innerText = "👤 MON PROFIL";
     msg.innerHTML = menuHtml;
@@ -319,15 +252,53 @@ window.deleteAccount = async () => {
 };
 
 // --- GESTION QUANTITÉ DE PACKS ---
-window.updatePackQuantity = () => {
+window.updatePackQuantity = async () => {
     const select = document.getElementById('pack-quantity');
     const btn = document.getElementById('btn-draw');
     const quantity = parseInt(select.value);
+    const user = auth.currentUser;
+    const isAdmin = user && (user.email === ADMIN_EMAIL);
     
-    if (btn && quantity > 1) {
-        btn.innerHTML = `<div class="booster-content">OUVRIR ${quantity} BOOSTERS</div>`;
-    } else if (btn) {
-        btn.innerHTML = '<div class="booster-content">OUVRIR UN BOOSTER</div>';
+    // Vérifier si l'utilisateur a assez de packs
+    let availablePacks = PACKS_PER_COOLDOWN;
+    if (user && !isAdmin && btn) {
+        const genSelect = document.getElementById('gen-select');
+        const selectedGen = genSelect.value;
+        
+        try {
+            const snap = await getDoc(doc(db, "players", user.uid));
+            if (snap.exists()) {
+                const packsByGen = snap.data().packsByGen || {};
+                const genData = packsByGen[selectedGen] || { availablePacks: PACKS_PER_COOLDOWN };
+                availablePacks = genData.availablePacks ?? PACKS_PER_COOLDOWN;
+                
+                // Désactiver le bouton si pas assez de packs, sinon le réactiver
+                if (availablePacks < quantity) {
+                    btn.disabled = true;
+                    btn.classList.add('disabled');
+                } else {
+                    btn.disabled = false;
+                    btn.classList.remove('disabled');
+                }
+            }
+        } catch (e) {
+            console.error("Erreur vérification packs:", e);
+        }
+    }
+    
+    // Toujours mettre à jour le texte du bouton (sauf si en mode PATIENTEZ)
+    if (btn && !btn.innerHTML.includes('PATIENTEZ') && !btn.innerHTML.includes('⏳')) {
+        if (quantity > 1) {
+            btn.innerHTML = `<div class="booster-content">OUVRIR ${quantity} BOOSTERS</div>`;
+        } else {
+            btn.innerHTML = '<div class="booster-content">OUVRIR UN BOOSTER</div>';
+        }
+    }
+    
+    // Mettre à jour l'affichage du nombre de packs disponibles
+    const packsInfo = document.getElementById('packs-info');
+    if (packsInfo && user && !isAdmin) {
+        packsInfo.textContent = `(${availablePacks}/${PACKS_PER_COOLDOWN} disponibles)`;
     }
 };
 
@@ -395,8 +366,7 @@ onAuthStateChanged(auth, async (user) => {
             };
         }
 
-        // Check Notifications (Visuel uniquement)
-        updateBellIcon();
+
 
         // 1. Charger la collection
         await fetchUserCollection(user.uid);
@@ -410,13 +380,7 @@ onAuthStateChanged(auth, async (user) => {
             openBoosterVisual(revealedCards);
         }
         
-        // Vérifier les notifications admin
-        if (snap.exists() && snap.data().adminNotification) {
-            const notif = snap.data().adminNotification;
-            window.showPopup("Notification Admin", notif.message);
-            // Supprimer la notification après affichage
-            await setDoc(doc(db, "players", user.uid), { adminNotification: null }, { merge: true });
-        }
+
         
         // 3. Charger le classeur (Gen par défaut)
         await changeGen(); 
@@ -445,6 +409,9 @@ async function fetchUserCollection(uid) {
             userCollection = snap.data().collection || [];
             const countEl = document.getElementById('card-count');
             if(countEl) countEl.innerText = userCollection.length;
+            
+            // Mettre à jour l'affichage des points
+            updatePointsDisplay();
         } else {
             // Le compte n'existe pas en Firestore -> Recréer automatiquement
             console.log("Document joueur inexistant, création...");
@@ -453,17 +420,156 @@ async function fetchUserCollection(uid) {
                 collection: [],
                 lastDrawTime: 0,
                 availablePacks: PACKS_PER_COOLDOWN,
-                role: 'player'
+                role: 'player',
+                points: 0,
+                bonusPacks: 0
             });
             userCollection = [];
             const countEl = document.getElementById('card-count');
             if(countEl) countEl.innerText = 0;
+            updatePointsDisplay();
         }
     } catch (e) {
         console.error("Erreur chargement collection:", e);
         window.showPopup("Erreur", "Impossible de charger votre profil. Veuillez vous reconnecter.");
         await signOut(auth);
     }
+}
+
+// Fonction pour afficher les points et bonus packs
+async function updatePointsDisplay() {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const snap = await getDoc(doc(db, "players", user.uid));
+    if (!snap.exists()) return;
+    
+    const data = snap.data();
+    const genSelect = document.getElementById('gen-select');
+    const currentGen = genSelect ? genSelect.value : 'gen7';
+    
+    // Récupérer les données de la génération active
+    const packsByGen = data.packsByGen || {};
+    const genData = packsByGen[currentGen] || { points: 0, bonusPacks: 0 };
+    const points = genData.points || 0;
+    const bonusPacks = genData.bonusPacks || 0;
+    
+    // Mettre à jour la valeur des points
+    const pointsValueEl = document.getElementById('points-value');
+    if (pointsValueEl) {
+        pointsValueEl.textContent = `${points}/${POINTS_FOR_BONUS_PACK}`;
+    }
+    
+    // Mettre à jour la barre de progression
+    const progressFillEl = document.getElementById('points-progress-fill');
+    if (progressFillEl) {
+        const percentage = (points / POINTS_FOR_BONUS_PACK) * 100;
+        progressFillEl.style.width = `${percentage}%`;
+    }
+    
+    // Afficher/masquer la section des bonus packs
+    const bonusInfoEl = document.getElementById('bonus-packs-info');
+    const bonusCountEl = document.getElementById('bonus-packs-count');
+    const bonusPluralEl = document.getElementById('bonus-plural');
+    
+    if (bonusInfoEl && bonusCountEl) {
+        if (bonusPacks > 0) {
+            bonusInfoEl.style.display = 'block';
+            bonusCountEl.textContent = bonusPacks;
+            if (bonusPluralEl) {
+                bonusPluralEl.textContent = bonusPacks > 1 ? 's' : '';
+            }
+        } else {
+            bonusInfoEl.style.display = 'none';
+        }
+    }
+}
+
+// Fonction pour utiliser un bonus pack
+window.useBonusPack = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const snap = await getDoc(doc(db, "players", user.uid));
+    if (!snap.exists()) return;
+    
+    const data = snap.data();
+    const genSelect = document.getElementById('gen-select');
+    const currentGen = genSelect ? genSelect.value : 'gen7';
+    
+    // Récupérer les données de la génération active
+    const packsByGen = data.packsByGen || {};
+    const genData = packsByGen[currentGen] || { points: 0, bonusPacks: 0 };
+    const bonusPacks = genData.bonusPacks || 0;
+    
+    if (bonusPacks <= 0) {
+        window.showPopup("Pas de bonus", "Vous n'avez pas de booster bonus disponible pour cette génération.");
+        return;
+    }
+    
+    // Décrémenter le bonus pack pour cette génération
+    packsByGen[currentGen] = {
+        ...genData,
+        bonusPacks: bonusPacks - 1
+    };
+    
+    await setDoc(doc(db, "players", user.uid), {
+        packsByGen: packsByGen
+    }, { merge: true });
+    
+    // Mettre à jour l'affichage
+    updatePointsDisplay();
+    
+    // Ouvrir un booster
+    drawCard();
+}
+
+// Fonction pour ouvrir la boutique
+window.openShop = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const snap = await getDoc(doc(db, "players", user.uid));
+    if (!snap.exists()) return;
+    
+    const data = snap.data();
+    const genSelect = document.getElementById('gen-select');
+    const currentGen = genSelect ? genSelect.value : 'gen7';
+    const packsByGen = data.packsByGen || {};
+    const genData = packsByGen[currentGen] || { points: 0, bonusPacks: 0 };
+    const points = genData.points || 0;
+    const bonusPacks = genData.bonusPacks || 0;
+    
+    const shopHtml = `
+        <div style="text-align: center;">
+            <div style="font-size: 3rem; margin: 20px 0;">🎁</div>
+            <div style="font-size: 1.2rem; margin-bottom: 20px;">
+                <strong>Vos points :</strong> ${points}/${POINTS_FOR_BONUS_PACK}<br>
+                <strong>Boosters bonus disponibles :</strong> ${bonusPacks}
+            </div>
+            <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; margin: 20px 0;">
+                <p style="margin: 10px 0;">💎 Chaque carte obtenue vous donne <strong>${POINTS_PER_CARD} point</strong></p>
+                <p style="margin: 10px 0;">🎁 Chaque fois que vous atteignez <strong>${POINTS_FOR_BONUS_PACK} points</strong>, vous gagnez un booster bonus</p>
+                <p style="margin: 10px 0;">✨ Les points excédentaires sont conservés pour le prochain booster</p>
+            </div>
+            <div style="background: rgba(59, 76, 202, 0.2); padding: 15px; border-radius: 10px; margin-top: 15px; border: 2px solid rgba(59, 76, 202, 0.5);">
+                <p style="color: var(--secondary); font-weight: bold; margin-bottom: 10px;">📊 Progression actuelle</p>
+                <div style="width: 100%; height: 30px; background: rgba(0,0,0,0.4); border-radius: 15px; overflow: hidden; margin: 10px 0;">
+                    <div style="height: 100%; width: ${(points / POINTS_FOR_BONUS_PACK) * 100}%; background: linear-gradient(90deg, #FFD700 0%, #FFA500 100%); border-radius: 15px; transition: width 0.5s ease;"></div>
+                </div>
+                <p style="color: #ccc; font-size: 0.9rem;">${points} / ${POINTS_FOR_BONUS_PACK} points</p>
+            </div>
+            ${bonusPacks > 0 ? `
+                <button onclick="closePopup(); useBonusPack();" class="btn-primary" style="width: 100%; padding: 15px; margin-top: 20px; font-size: 1.1rem;">
+                    🎁 Utiliser un booster bonus (${bonusPacks} disponible${bonusPacks > 1 ? 's' : ''})
+                </button>
+            ` : `
+                <p style="color: #999; margin-top: 20px;">Collectionnez plus de cartes pour gagner des boosters bonus !</p>
+            `}
+        </div>
+    `;
+    
+    window.showPopup("🛒 BOUTIQUE", shopHtml);
 }
 
 // --- LOGIQUE CLASSEUR (BINDER) ---
@@ -482,6 +588,12 @@ window.changeGen = async () => {
     if (user && user.email !== ADMIN_EMAIL) {
         await checkCooldown(user.uid);
     }
+    
+    // Mettre à jour la disponibilité du bouton selon la quantité sélectionnée
+    await updatePackQuantity();
+    
+    // Mettre à jour l'affichage des points pour cette génération
+    await updatePointsDisplay();
     
     // On charge tous les JSONs de la génération
     for (const rate of GAME_CONFIG.dropRates) {
@@ -875,26 +987,40 @@ window.drawCard = async () => {
             boosterRevealedCards: [] // Aucune carte révélée au départ
         };
         
+        // Récupérer les données actuelles une seule fois
+        const currentSnap = await getDoc(doc(db, "players", user.uid));
+        const currentData = currentSnap.exists() ? currentSnap.data() : {};
+        const packsByGen = currentData.packsByGen || {};
+        const genData = packsByGen[selectedGen] || { availablePacks: PACKS_PER_COOLDOWN, lastDrawTime: 0, points: 0, bonusPacks: 0 };
+        
         if (!isAdmin) {
             // Décrémenter les packs disponibles pour cette génération
-            const snap = await getDoc(doc(db, "players", user.uid));
-            const data = snap.exists() ? snap.data() : {};
-            const packsByGen = data.packsByGen || {};
-            const genData = packsByGen[selectedGen] || { availablePacks: PACKS_PER_COOLDOWN, lastDrawTime: 0 };
-            
             let availablePacks = genData.availablePacks ?? PACKS_PER_COOLDOWN;
             availablePacks = Math.max(0, availablePacks - packQuantity);
-            
-            packsByGen[selectedGen] = {
-                availablePacks: availablePacks,
-                lastDrawTime: Date.now()
-            };
-            
-            updateData.packsByGen = packsByGen;
-            
-            // Mettre à jour l'affichage
-            updatePacksDisplay(availablePacks);
+            genData.availablePacks = availablePacks;
+            genData.lastDrawTime = Date.now();
         }
+        
+        // Calculer les points gagnés
+        const cardsCount = tempBoosterCards.length;
+        const pointsGained = cardsCount * POINTS_PER_CARD;
+        
+        const currentPoints = genData.points || 0;
+        const currentBonusPacks = genData.bonusPacks || 0;
+        
+        // Calculer nouveaux points et bonus packs pour cette génération
+        const totalPoints = currentPoints + pointsGained;
+        const earnedBonusPacks = Math.floor(totalPoints / POINTS_FOR_BONUS_PACK);
+        const remainingPoints = totalPoints % POINTS_FOR_BONUS_PACK;
+        
+        // Mettre à jour les données de cette génération (conserve availablePacks et lastDrawTime)
+        packsByGen[selectedGen] = {
+            ...genData,
+            points: remainingPoints,
+            bonusPacks: currentBonusPacks + earnedBonusPacks
+        };
+        
+        updateData.packsByGen = packsByGen;
         
         // Utiliser setDoc avec merge pour créer le document s'il n'existe pas
         await setDoc(doc(db, "players", user.uid), updateData, { merge: true });
@@ -902,6 +1028,17 @@ window.drawCard = async () => {
         // Ajout à la collection locale
         userCollection.push(...tempBoosterCards);
         document.getElementById('card-count').innerText = userCollection.length;
+        
+        // Mettre à jour l'affichage des points
+        updatePointsDisplay();
+        
+        // Mettre à jour l'affichage du nombre de packs disponibles
+        await updatePackQuantity();
+        
+        // Afficher un message si un booster bonus a été gagné
+        if (earnedBonusPacks > 0) {
+            window.showPopup("🎁 Booster Bonus!", `Vous avez gagné ${earnedBonusPacks} booster(s) bonus avec vos points !`);
+        }
 
         // Gestion Timer
         if (!isAdmin) {
@@ -932,9 +1069,11 @@ function openBoosterVisual(alreadyRevealed = []) {
     const overlay = document.getElementById('booster-overlay');
     const container = document.getElementById('booster-cards-container');
     const closeBtn = document.getElementById('close-booster-btn');
+    const revealAllBtn = document.getElementById('reveal-all-btn');
     
     container.innerHTML = '';
     closeBtn.style.display = 'none';
+    revealAllBtn.style.display = 'inline-block';
     overlay.style.display = 'flex';
     
     // Bloquer le scroll de la page en arrière-plan
@@ -944,11 +1083,27 @@ function openBoosterVisual(alreadyRevealed = []) {
     
     // Calculer le displayId et totalCards pour chaque carte du booster
     const totalCards = currentGenData.length;
+    
+    // Compter combien de cartes possédées dans ce booster
+    let cardsOwned = 0;
+    tempBoosterCards.forEach(card => {
+        const isOwned = userCollection.some(c => c.id === card.id);
+        if (isOwned) cardsOwned++;
+    });
+    
+    // Mettre à jour le titre avec le compteur de cartes
+    const title = document.querySelector('.opening-title');
+    if (title) {
+        title.innerHTML = `CLIQUEZ POUR RÉVÉLER ! <span style="color: var(--secondary); margin-left: 15px;">(${cardsOwned}/${tempBoosterCards.length} possédées)</span>`;
+    }
 
     tempBoosterCards.forEach((card, index) => {
         // Trouver le displayId de la carte dans currentGenData
         const cardInGen = currentGenData.find(c => c.id === card.id);
         const cardNumber = cardInGen ? cardInGen.displayId : null;
+        
+        // Vérifier si la carte est nouvelle (non possédée)
+        const isNewCard = !userCollection.some(c => c.id === card.id);
         
         const flipCard = document.createElement('div');
         flipCard.className = 'flip-card';
@@ -972,6 +1127,24 @@ function openBoosterVisual(alreadyRevealed = []) {
         const back = document.createElement('div');
         back.className = 'flip-card-back'; // Face (Carte)
         const cardEl = createCardElement(card, 1, cardNumber, totalCards);
+        
+        // Ajouter un badge "Nouveau !" si la carte n'est pas possédée
+        if (isNewCard) {
+            const newBadge = document.createElement('div');
+            newBadge.className = 'new-card-badge';
+            newBadge.textContent = 'Nouveau !';
+            back.appendChild(newBadge);
+            
+            // Au survol de la carte, cacher définitivement le badge
+            flipCard.addEventListener('mouseenter', function() {
+                newBadge.classList.add('hidden');
+                // Arrêter l'animation après un court délai
+                setTimeout(() => {
+                    newBadge.style.animation = 'none';
+                }, 500);
+            }, { once: true });
+        }
+        
         back.appendChild(cardEl);
 
         inner.appendChild(front);
@@ -1014,7 +1187,6 @@ function openBoosterVisual(alreadyRevealed = []) {
                 if(cardsRevealed === tempBoosterCards.length) {
                     closeBtn.style.display = 'block';
                     document.getElementById('reveal-all-btn').style.display = 'none';
-                    document.getElementById('screenshot-btn').style.display = 'inline-block';
                 }
             }
         };
@@ -1026,7 +1198,6 @@ function openBoosterVisual(alreadyRevealed = []) {
     if (cardsRevealed === tempBoosterCards.length) {
         closeBtn.style.display = 'block';
         document.getElementById('reveal-all-btn').style.display = 'none';
-        document.getElementById('screenshot-btn').style.display = 'inline-block';
     }
 }
 
@@ -1057,75 +1228,7 @@ window.revealAllCards = async () => {
     setTimeout(() => {
         document.getElementById('close-booster-btn').style.display = 'block';
         document.getElementById('reveal-all-btn').style.display = 'none';
-        document.getElementById('screenshot-btn').style.display = 'inline-block';
     }, flipCards.length * 100 + 600);
-};
-
-// Capturer l'écran de l'ouverture
-window.screenshotBooster = async () => {
-    const overlay = document.getElementById('booster-overlay');
-    const container = document.getElementById('booster-cards-container');
-    const title = document.querySelector('.opening-title');
-    const actions = document.querySelector('.booster-actions');
-    const closeBtn = document.getElementById('close-booster-btn');
-    
-    // Masquer temporairement les boutons
-    const originalTitleDisplay = title.style.display;
-    const originalActionsDisplay = actions.style.display;
-    const originalCloseBtnDisplay = closeBtn.style.display;
-    
-    title.style.display = 'none';
-    actions.style.display = 'none';
-    closeBtn.style.display = 'none';
-    
-    try {
-        // Attendre que le DOM soit mis à jour
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Utiliser html2canvas si disponible
-        if (typeof html2canvas !== 'undefined') {
-            const canvas = await html2canvas(overlay, {
-                backgroundColor: '#2c3e50',
-                scale: 2,
-                logging: false,
-                useCORS: true,
-                allowTaint: true,
-                width: overlay.scrollWidth,
-                height: overlay.scrollHeight,
-                windowWidth: overlay.scrollWidth,
-                windowHeight: overlay.scrollHeight
-            });
-            
-            // Télécharger l'image
-            canvas.toBlob(blob => {
-                if (blob) {
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `booster-${Date.now()}.png`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    window.showPopup("✅ Capture réussie", "L'image a été téléchargée !");
-                } else {
-                    window.showPopup("Erreur", "Impossible de créer l'image. Utilisez 'Impr écran'.");
-                }
-            }, 'image/png');
-        } else {
-            window.showPopup("Info", "Bibliothèque html2canvas non chargée. Utilisez 'Impr écran'.");
-        }
-    } catch (e) {
-        console.error("Erreur capture:", e);
-        window.showPopup("Erreur", "Impossible de capturer. Utilisez 'Impr écran' sur votre clavier.");
-    } finally {
-        // Restaurer les boutons après un délai
-        setTimeout(() => {
-            title.style.display = originalTitleDisplay;
-            actions.style.display = originalActionsDisplay;
-            closeBtn.style.display = originalCloseBtnDisplay;
-        }, 500);
-    }
 };
 
 window.closeBooster = async () => {
@@ -1135,6 +1238,12 @@ window.closeBooster = async () => {
     document.body.classList.remove('booster-active');
     
     const btn = document.getElementById('btn-draw');
+    
+    // Désactiver le bouton pendant 3 secondes
+    btn.disabled = true;
+    btn.innerHTML = '<div class="booster-content">PATIENTEZ...</div>';
+    
+    await new Promise(resolve => setTimeout(resolve, BOOSTER_DELAY_SECONDS * 1000));
     
     // Nettoyer les données de booster en cours dans Firestore
     const user = auth.currentUser;
@@ -1201,50 +1310,39 @@ async function checkCooldown(uid) {
             }, { merge: true });
         }
         
-        // Afficher le nombre de packs disponibles avec animation si régénération
-        updatePacksDisplay(availablePacks, wasZero && availablePacks === PACKS_PER_COOLDOWN);
-        
         if (availablePacks > 0) {
             enableBoosterButton(true);
+            // Vérifier si on peut ouvrir le nombre de packs sélectionné
+            await updatePackQuantity();
         } else {
             // Calculer le temps restant avant la régénération complète
             const timeToNextPack = cooldownMs - diff;
             startTimer(timeToNextPack, uid);
+            // Mettre à jour quand même l'affichage des packs (0)
+            await updatePackQuantity();
         }
     } else {
-        updatePacksDisplay(PACKS_PER_COOLDOWN);
         enableBoosterButton(true);
+        await updatePackQuantity();
     }
 }
 
 function updatePacksDisplay(count, animate = false) {
+    // Cette fonction n'est plus nécessaire, tout est géré par updatePackQuantity()
+    // Cacher l'ancien affichage
     const packsDisplay = document.getElementById('packs-available');
-    const packsCount = document.getElementById('packs-count');
-    if (packsDisplay && packsCount) {
-        const wasHidden = packsDisplay.style.display === 'none';
-        packsCount.innerText = count;
-        // Cacher le compteur si 0 packs disponibles
-        packsDisplay.style.display = count > 0 ? 'block' : 'none';
-        
-        // Animation quand les packs reviennent disponibles
-        if (animate && count === PACKS_PER_COOLDOWN && wasHidden) {
-            packsDisplay.classList.remove('packs-ready-animation');
-            void packsDisplay.offsetWidth; // Force reflow
-            packsDisplay.classList.add('packs-ready-animation');
-            setTimeout(() => packsDisplay.classList.remove('packs-ready-animation'), 2000);
-        }
+    if (packsDisplay) {
+        packsDisplay.style.display = 'none';
     }
 }
 
 function startTimer(durationMs, uid = null) {
     const btn = document.getElementById('btn-draw');
     const display = document.getElementById('cooldown-display');
-    const val = document.getElementById('timer-val');
     
     btn.disabled = true;
     btn.classList.add('disabled');
-    btn.innerHTML = `<div class="booster-content">RECHARGEMENT...</div>`;
-    display.style.display = 'block';
+    display.style.display = 'none';
 
     let remaining = durationMs;
     if (cooldownInterval) clearInterval(cooldownInterval);
@@ -1260,7 +1358,7 @@ function startTimer(durationMs, uid = null) {
         }
         const m = Math.floor((remaining / 1000 / 60) % 60);
         const s = Math.floor((remaining / 1000) % 60);
-        val.innerText = `${m}:${s < 10 ? '0'+s : s}`;
+        btn.innerHTML = `<div class="booster-content">⏳ Prochain dans ${m}:${s < 10 ? '0'+s : s}</div>`;
     };
     tick();
     cooldownInterval = setInterval(tick, 1000);
@@ -1278,21 +1376,7 @@ function enableBoosterButton(enabled) {
     }
 }
 
-// --- NOTIFICATIONS ---
-window.requestNotification = async () => {
-    if (!("Notification" in window)) return;
-    const permission = await Notification.requestPermission();
-    updateBellIcon();
-    if (permission === "granted") {
-        new Notification("Poké-TCG", { body: "Notifications activées !", icon: "icons/fire.svg" });
-    }
-};
-
-function updateBellIcon() {
-    const bell = document.getElementById('notif-bell');
-    if (Notification.permission === "granted") bell.classList.add('bell-active');
-    else bell.classList.remove('bell-active');
-}
+// --- NOTIFICATIONS SUPPRIMÉES ---
 
 // --- AUTH HELPERS ---
 window.googleLogin = async () => {
@@ -1382,7 +1466,9 @@ async function authUser(promise) {
                 collection: [],
                 packsByGen: {},
                 lastDrawTime: 0,
-                availablePacks: PACKS_PER_COOLDOWN
+                availablePacks: PACKS_PER_COOLDOWN,
+                points: 0,
+                bonusPacks: 0
             });
         }
     } catch (e) {
