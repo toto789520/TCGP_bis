@@ -202,64 +202,7 @@ function pushUrlState(replace = true) {
     }
 }
 
-// --- ENREGISTREMENT SERVICE WORKER (PWA) ---
-let deferredPrompt = null;
-let swRegistration = null;
-
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-            .then(registration => {
-                swRegistration = registration;
-                Logger.info('Service Worker enregistré', { scope: registration.scope });
-            })
-            .catch(error => {
-                Logger.error('Erreur Service Worker', error);
-            });
-    });
-}
-
-// Capture l'événement d'installation PWA
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    Logger.info('PWA prête à être installée');
-    // Afficher le bouton d'installation
-    const installBtn = document.getElementById('install-pwa-btn');
-    if (installBtn) {
-        installBtn.style.display = 'inline-block';
-    }
-});
-
-// Fonction d'installation PWA
-window.installPWA = async function() {
-    if (!deferredPrompt) return;
-    
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    
-    if (outcome === 'accepted') {
-        Logger.info('PWA installée avec succès');
-    } else {
-        Logger.info('Installation PWA annulée par l\'utilisateur');
-    }
-    
-    deferredPrompt = null;
-    const installBtn = document.getElementById('install-pwa-btn');
-    if (installBtn) {
-        installBtn.style.display = 'none';
-    }
-};
-
-// Cacher le bouton si déjà installé
-window.addEventListener('appinstalled', () => {
-    Logger.info('PWA installée (événement appinstalled)');
-    const installBtn = document.getElementById('install-pwa-btn');
-    if (installBtn) {
-        installBtn.style.display = 'none';
-    }
-    deferredPrompt = null;
-});
+// PWA installation support removed per request
 
 // --- 1. CONFIGURATION ---
 const ADMIN_EMAIL = "bryan.drouet24@gmail.com";
@@ -392,25 +335,14 @@ let selectedRarityFilter = null; // Filtre de rareté actif
 
 // --- INITIALISATION AU CHARGEMENT DE LA PAGE ---
 window.onload = () => {
-    // Vérifier si on est dans un environnement problématique
+    // Vérifier si on est dans un environnement problématique (warning removed)
     if (DeviceInfo.isProblematicBrowser) {
         Logger.warn('Navigateur problématique détecté', { 
             userAgent: navigator.userAgent,
             isCometBrowser: DeviceInfo.isCometBrowser,
             isInAppBrowser: DeviceInfo.isInAppBrowser
         });
-        
-        // Afficher un avertissement pour les utilisateurs
-        const warningHtml = `
-            <div style="background: #ff9800; color: white; padding: 10px; text-align: center; font-size: 0.9rem;">
-                <img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Pour une meilleure expérience, ouvrez ce site dans votre navigateur principal (Safari, Chrome, Firefox).
-            </div>
-        `;
-        
-        const body = document.body;
-        const warningDiv = document.createElement('div');
-        warningDiv.innerHTML = warningHtml;
-        body.insertBefore(warningDiv.firstElementChild, body.firstElementChild);
+        // No UI warning inserted per user request; optionally display a subtle note elsewhere if needed
     }
     
     // Initialiser les options de génération

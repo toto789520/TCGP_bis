@@ -30,12 +30,7 @@
     <meta name="twitter:image" content="https://votre-domaine.com/og-image.png">
     <meta name="twitter:creator" content="@votre_twitter">
     
-    <!-- PWA / App -->
-    <link rel="manifest" href="manifest.json">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Poké-TCG">
+    <!-- PWA / App metadata removed -->
     
     <!-- Icons -->
     <link rel="icon" type="image/x-icon" href="favicon.ico">
@@ -91,7 +86,7 @@
         <nav>
             <div class="nav-logo">TCG <span class="version">Binder</span></div>
             <div class="player-stats">
-                <button id="install-pwa-btn" class="btn-install-pwa" onclick="installPWA()" style="display: none;" title="Installer l'application"><img src="assets/icons/smartphone.svg" class="title-icon" alt="install"> Installer</button>
+                <!-- install button removed -->
                 <span class="user-pill" id="user-profile-pill" style="cursor: pointer;"><img src="assets/icons/user.svg" class="title-icon" alt="user" style="width:17px; filter: brightness(0) saturate(100%) invert(100%) sepia(0%) saturate(0%) hue-rotate(93deg) brightness(103%) contrast(103%);"> <span id="user-display">...</span></span>
                     <span class="user-pill no-hover" title="Nombre total de cartes (tous packs confondus)"><span id="card-count">0</span> cartes en tout</span>
                 <button onclick="logout()" class="btn-logout">Sortir</button>

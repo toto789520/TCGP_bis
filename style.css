@@ -308,7 +308,6 @@ img:not(.icon-inline):not(.title-icon):not(.card-img):not(.logo-img) { max-width
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 15px;
     flex-wrap: wrap;
 }
 
