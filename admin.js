@@ -75,7 +75,7 @@ window.loadAllPlayers = async () => {
             tr.innerHTML = `
                 <td><strong>${data.email}</strong></td>
                 <td style="color:${roleColor}; font-weight:bold;">${roleIcon} ${role.toUpperCase()}</td>
-                <td><span class="user-pill">🃏 ${data.collection ? data.collection.length : 0}</span></td>
+                <td><span class="user-pill">${data.collection ? data.collection.length : 0} cartes en tout</span></td>
                 <td>
                     <div>
                         ${actions}

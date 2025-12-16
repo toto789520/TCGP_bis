@@ -7,8 +7,10 @@ const Logger = {
     logs: [],
     maxLogs: 100,
     maxStoredLogs: 50,
+    enabled: false, // Désactiver par défaut en production
     
     log(level, message, data = null) {
+        if (!this.enabled) return; // Ne rien faire si désactivé
         const timestamp = new Date().toISOString();
         const logEntry = {
             timestamp,
@@ -205,6 +207,7 @@ const PACKS_PER_COOLDOWN = 3;
 const POINTS_PER_CARD = 1;
 const POINTS_FOR_BONUS_PACK = 30;
 const BOOSTER_DELAY_SECONDS = 3;
+const AUTH_LOADING_TIMEOUT_MS = 10000; // 10 secondes max pour l'authentification
 
 // TA CONFIG FIREBASE (Celle que tu m'as donnée)
 const firebaseConfig = {
@@ -382,6 +385,18 @@ window.closePopup = () => {
     if(el) el.style.display = 'none'; 
 };
 
+// Affiche un message d'authentification stylisé dans le popup
+window.showAuthStatusPopup = (statusText = 'Connexion en cours...') => {
+    const html = `
+        <p id="auth-msg" class="auth-msg">${statusText}</p>
+        <p class="auth-note">Les VIPs ont un cooldown de <strong>4 minutes</strong>.</p>
+        <div style="display:flex; justify-content:flex-end;">
+            <button class="btn-tertiary popup-action-btn" onclick="closePopup();">⬅ Retour au Jeu</button>
+        </div>
+    `;
+    window.showPopup('Connexion', html);
+};
+
 // --- MENU PROFIL ---
 function showProfileMenu() {
     const menuHtml = `
@@ -464,7 +479,7 @@ window.deleteAccount = async () => {
 window.updatePackQuantity = async () => {
     const select = document.getElementById('pack-quantity');
     const btn = document.getElementById('btn-draw');
-    const quantity = parseInt(select.value);
+    const quantity = parseInt(select.value) || 0; // Ensure quantity is a number
     const user = auth.currentUser;
     const isAdmin = user && (user.email === ADMIN_EMAIL);
     
@@ -575,6 +590,7 @@ startAuthTimeout();
 
 onAuthStateChanged(auth, async (user) => {
     const loader = document.getElementById('global-loader');
+    let isAdmin = false;
     
     // Annuler le timeout si l'auth se résout
     if (authLoadingTimeout) {
@@ -599,7 +615,7 @@ onAuthStateChanged(auth, async (user) => {
             document.getElementById('user-display').innerText = user.email.split('@')[0];
             
             // Vérif Admin (Basique sur email)
-            const isAdmin = (user.email === ADMIN_EMAIL);
+            isAdmin = (user.email === ADMIN_EMAIL);
             const adminPreview = document.getElementById('admin-preview-container');
             if(adminPreview) adminPreview.style.display = isAdmin ? 'block' : 'none';
             
@@ -615,8 +631,24 @@ onAuthStateChanged(auth, async (user) => {
                 };
             }
 
+            // Empêcher la désactivation simultanée des toggles Possédées / Manquantes
+            const showOwnedEl = document.getElementById('show-owned');
+            const showMissingEl = document.getElementById('show-missing');
+            const ensureAtLeastOne = (changedEl, otherEl) => {
+                if (!changedEl.checked && !otherEl.checked) {
+                    // Si les deux sont décochés, réactiver l'autre
+                    otherEl.checked = true;
+                }
+                filterBinder();
+            };
+            if (showOwnedEl && showMissingEl) {
+                showOwnedEl.onchange = () => ensureAtLeastOne(showOwnedEl, showMissingEl);
+                showMissingEl.onchange = () => ensureAtLeastOne(showMissingEl, showOwnedEl);
+            }
+
             // Check Notifications (Visuel uniquement)
             updateBellIcon();
+            // Icons are not loaded from CDN anymore
             // Attacher le clic sur la cloche pour activer/désactiver les notifications
             const bellEl = document.getElementById('notif-bell');
             if (bellEl) {
@@ -816,22 +848,9 @@ window.useBonusPack = async () => {
         window.showPopup("Pas de bonus", "Vous n'avez pas de booster bonus disponible pour cette génération.");
         return;
     }
-    
-    // Décrémenter le bonus pack pour cette génération
-    packsByGen[currentGen] = {
-        ...genData,
-        bonusPacks: bonusPacks - 1
-    };
-    
-    await setDoc(doc(db, "players", user.uid), {
-        packsByGen: packsByGen
-    }, { merge: true });
-    
-    // Mettre à jour l'affichage
-    updatePointsDisplay();
-    
-    // Ouvrir un booster
-    drawCard();
+    // Ouvrir autant de boosters que de boosters bonus accumulés
+    // drawCard gère la consommation des bonus quand on passe { isBonus: true }
+    await drawCard(bonusPacks, { isBonus: true });
 }
 
 // Fonction pour ouvrir la boutique
@@ -889,7 +908,15 @@ window.changeGen = async () => {
     
     const gen = genSelect.value;
     const grid = document.getElementById('cards-grid');
-    grid.innerHTML = '<div style="color:white; text-align:center; width:100%; padding:20px;">Chargement du classeur...</div>';
+    // Ne pas afficher le texte "Chargement du classeur..." dans la grille pour éviter
+    // le déplacement visuel — laisser la grille vide jusqu'à ce que les cartes soient prêtes.
+    grid.innerHTML = '';
+
+    // Ne pas insérer le placeholder dans les stats non plus
+    const statsContainer = document.getElementById('rarity-stats');
+    if (statsContainer) {
+        statsContainer.innerHTML = '';
+    }
 
     currentGenData = []; // Reset des données locales
     
@@ -1189,7 +1216,7 @@ function createCardElement(card, quantity = 1, cardNumber = null, totalCards = n
 }
 
 // --- OUVERTURE DE BOOSTER ---
-window.drawCard = async () => {
+window.drawCard = async (overridePackQuantity = null, options = {}) => {
     const user = auth.currentUser;
     if (!user) return;
 
@@ -1202,12 +1229,18 @@ window.drawCard = async () => {
     const genSelect = document.getElementById('gen-select');
     const selectedGen = genSelect.value;
     
-    // Récupérer la quantité de packs à ouvrir
+    // Récupérer la quantité de packs à ouvrir (peut être surchargée en param)
     const packQuantitySelect = document.getElementById('pack-quantity');
-    const packQuantity = parseInt(packQuantitySelect.value);
+    let packQuantity;
+    if (overridePackQuantity !== null && !isNaN(parseInt(overridePackQuantity))) {
+        packQuantity = parseInt(overridePackQuantity);
+    } else {
+        packQuantity = parseInt(packQuantitySelect.value);
+    }
     
-    // Vérifier si l'utilisateur a assez de packs disponibles
-    if (!isAdmin) {
+    // Vérifier si l'utilisateur a assez de packs disponibles (sauf en bonus-mode)
+    const isBonus = !!options.isBonus;
+    if (!isAdmin && !isBonus) {
         const snap = await getDoc(doc(db, "players", user.uid));
         if (snap.exists()) {
             const packsByGen = snap.data().packsByGen || {};
@@ -1303,8 +1336,8 @@ window.drawCard = async () => {
         const packsByGen = currentData.packsByGen || {};
         const genData = packsByGen[selectedGen] || { availablePacks: PACKS_PER_COOLDOWN, lastDrawTime: 0, points: 0, bonusPacks: 0 };
         
-        if (!isAdmin) {
-            // Décrémenter les packs disponibles pour cette génération
+        // Si ce n'est pas un bonus, on décrémente les packs disponibles (sauf admin)
+        if (!isAdmin && !isBonus) {
             let availablePacks = genData.availablePacks ?? PACKS_PER_COOLDOWN;
             availablePacks = Math.max(0, availablePacks - packQuantity);
             genData.availablePacks = availablePacks;
@@ -1318,6 +1351,12 @@ window.drawCard = async () => {
         const currentPoints = genData.points || 0;
         const currentBonusPacks = genData.bonusPacks || 0;
         
+        // Si on utilise des boosters bonus, soustraire la quantité utilisée avant de calculer les gains
+        let startingBonusPacks = currentBonusPacks;
+        if (isBonus) {
+            startingBonusPacks = Math.max(0, currentBonusPacks - packQuantity);
+        }
+
         // Calculer nouveaux points et bonus packs pour cette génération
         const totalPoints = currentPoints + pointsGained;
         const earnedBonusPacks = Math.floor(totalPoints / POINTS_FOR_BONUS_PACK);
@@ -1327,7 +1366,7 @@ window.drawCard = async () => {
         packsByGen[selectedGen] = {
             ...genData,
             points: remainingPoints,
-            bonusPacks: currentBonusPacks + earnedBonusPacks
+            bonusPacks: startingBonusPacks + earnedBonusPacks
         };
         
         updateData.packsByGen = packsByGen;
@@ -1382,7 +1421,8 @@ function openBoosterVisual(alreadyRevealed = []) {
     const revealAllBtn = document.getElementById('reveal-all-btn');
     
     container.innerHTML = '';
-    closeBtn.style.display = 'none';
+    // Réserver l'espace du bouton sans agrandir la page quand il apparaît
+    showCloseButton(false);
     revealAllBtn.style.display = 'inline-block';
     overlay.style.display = 'flex';
     
@@ -1404,7 +1444,7 @@ function openBoosterVisual(alreadyRevealed = []) {
     // Mettre à jour le titre avec le compteur de cartes
     const title = document.querySelector('.opening-title');
     if (title) {
-        title.innerHTML = `CLIQUEZ POUR RÉVÉLER ! <span style="color: var(--secondary); margin-left: 15px;">(${cardsOwned}/${tempBoosterCards.length} possédées)</span>`;
+        title.innerHTML = `CLIQUEZ POUR RÉVÉLER !`;
     }
 
     tempBoosterCards.forEach((card, index) => {
@@ -1466,13 +1506,7 @@ function openBoosterVisual(alreadyRevealed = []) {
             flipCard.classList.add('flipped');
         }
 
-        // Adapter la hauteur du dos de carte après le chargement de l'image
-        setTimeout(() => {
-            const cardHeight = cardEl.offsetHeight;
-            if (cardHeight > 0) {
-                front.style.height = cardHeight + 'px';
-            }
-        }, 100);
+        // La taille est gérée via CSS (aspect-ratio: 3 / 4), plus besoin de calcul JS
 
         // Click pour retourner
         flipCard.onclick = async () => {
@@ -1495,7 +1529,7 @@ function openBoosterVisual(alreadyRevealed = []) {
                 
                 // Si tout est révélé, on montre le bouton OK
                 if(cardsRevealed === tempBoosterCards.length) {
-                    closeBtn.style.display = 'block';
+                    showCloseButton(true);
                     document.getElementById('reveal-all-btn').style.display = 'none';
                 }
             }
@@ -1506,8 +1540,27 @@ function openBoosterVisual(alreadyRevealed = []) {
     
     // Si toutes les cartes sont déjà révélées, afficher le bouton directement
     if (cardsRevealed === tempBoosterCards.length) {
-        closeBtn.style.display = 'block';
+        showCloseButton(true);
         document.getElementById('reveal-all-btn').style.display = 'none';
+    }
+}
+
+// Helper pour afficher/masquer le bouton de fermeture avec animation
+function showCloseButton(show) {
+    const btn = document.getElementById('close-booster-btn');
+    if (!btn) return;
+    if (show) {
+        btn.style.visibility = 'visible';
+        btn.classList.remove('pop-enter');
+        // force reflow
+        void btn.offsetWidth;
+        btn.classList.add('pop-enter');
+    } else {
+        btn.classList.remove('pop-enter');
+        btn.style.opacity = '0';
+        setTimeout(() => {
+            if (!btn.classList.contains('pop-enter')) btn.style.visibility = 'hidden';
+        }, 300);
     }
 }
 
@@ -1536,7 +1589,7 @@ window.revealAllCards = async () => {
     
     // Afficher les boutons
     setTimeout(() => {
-        document.getElementById('close-booster-btn').style.display = 'block';
+        showCloseButton(true);
         document.getElementById('reveal-all-btn').style.display = 'none';
     }, flipCards.length * 100 + 600);
 };
@@ -1583,6 +1636,9 @@ window.closeBooster = async () => {
     // Réinitialiser les cartes temporaires
     tempBoosterCards = [];
     
+    // Mettre à jour l'affichage des points immédiatement après la fermeture
+    try { await updatePointsDisplay(); } catch (e) { /* silent */ }
+
     // Recharger le binder pour montrer les nouvelles cartes
     renderBinder();
 };
@@ -1809,6 +1865,7 @@ window.requestNotification = async () => {
 
 function updateBellIcon() {
     const bell = document.getElementById('notif-bell');
+    if (!bell) return; // élément absent -> rien à faire
     if (Notification.permission === "granted") bell.classList.add('bell-active');
     else bell.classList.remove('bell-active');
 }
@@ -1968,6 +2025,25 @@ window.signIn = async () => {
     }
 };
 window.logout = () => signOut(auth);
+
+// Toggle password visibility (button is non-tabbable via tabindex="-1")
+window.togglePasswordVisibility = (btn) => {
+    try {
+        const input = document.getElementById('password');
+        if (!input) return;
+        if (input.type === 'password') {
+            input.type = 'text';
+            btn.innerText = '🙈';
+            btn.setAttribute('aria-label', 'Masquer le mot de passe');
+        } else {
+            input.type = 'password';
+            btn.innerText = '👁️';
+            btn.setAttribute('aria-label', 'Afficher le mot de passe');
+        }
+    } catch (e) {
+        // silent
+    }
+};
 
 async function authUser(promise) {
     try {

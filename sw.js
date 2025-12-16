@@ -12,21 +12,12 @@ const urlsToCache = [
 
 // Fonction de logging pour le Service Worker
 function swLog(level, message, data = null) {
+  // Seules les erreurs et warnings sont loggées pour éviter le spam console
+  if (level === 'debug' || level === 'info') return;
   const timestamp = new Date().toISOString();
   const logMessage = `[SW-${level.toUpperCase()}] ${timestamp}: ${message}`;
-  
-  switch(level) {
-    case 'error':
-      console.error(logMessage, data || '');
-      break;
-    case 'warn':
-      console.warn(logMessage, data || '');
-      break;
-    case 'info':
-    case 'debug':
-    default:
-      console.log(logMessage, data || '');
-  }
+  if (level === 'error') console.error(logMessage, data || '');
+  else if (level === 'warn') console.warn(logMessage, data || '');
 }
 
 // Installation du Service Worker
