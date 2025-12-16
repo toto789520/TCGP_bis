@@ -118,22 +118,18 @@ window.resetCooldown = async (uid, email) => {
         packsByGen['special_bryan'] = {
             availablePacks: 3,
             lastDrawTime: 0,
-<<<<<<< HEAD
-            packsByGen: {}, // Reset tous les packs de toutes les générations
-=======
             points: 0,
             bonusPacks: 0
         };
-        
-        await updateDoc(doc(db, "players", uid), { 
+
+        await updateDoc(doc(db, "players", uid), {
             packsByGen: packsByGen,
->>>>>>> codespace-congenial-space-tribble-v5g74p7vxv7c4rr
             adminNotification: {
                 type: 'cooldown_reset',
                 message: '⚡ Tous vos cooldowns ont été réinitialisés par un administrateur !',
                 timestamp: Date.now()
             }
-        }); 
+        });
         window.showPopup("Succès", `Tous les cooldowns reset pour ${email}`); 
         loadAllPlayers(); 
     } catch (e) { 

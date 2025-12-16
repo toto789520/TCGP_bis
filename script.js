@@ -199,18 +199,12 @@ window.addEventListener('appinstalled', () => {
 });
 
 // --- 1. CONFIGURATION ---
-const ADMIN_EMAIL = "bryan.drouet24@gmail.com"; 
-<<<<<<< HEAD
-const COOLDOWN_MINUTES = 3;
-const PACKS_PER_COOLDOWN = 3;
-const AUTH_LOADING_TIMEOUT_MS = 10000; // 10 secondes max pour l'authentification 
-=======
+const ADMIN_EMAIL = "bryan.drouet24@gmail.com";
 const COOLDOWN_MINUTES = 7;
 const PACKS_PER_COOLDOWN = 3;
 const POINTS_PER_CARD = 1;
 const POINTS_FOR_BONUS_PACK = 30;
-const BOOSTER_DELAY_SECONDS = 3; 
->>>>>>> codespace-congenial-space-tribble-v5g74p7vxv7c4rr
+const BOOSTER_DELAY_SECONDS = 3;
 
 // TA CONFIG FIREBASE (Celle que tu m'as donnée)
 const firebaseConfig = {
@@ -623,6 +617,13 @@ onAuthStateChanged(auth, async (user) => {
 
             // Check Notifications (Visuel uniquement)
             updateBellIcon();
+            // Attacher le clic sur la cloche pour activer/désactiver les notifications
+            const bellEl = document.getElementById('notif-bell');
+            if (bellEl) {
+                bellEl.onclick = async () => {
+                    await toggleNotifications();
+                };
+            }
 
             // 1. Charger la collection
             Logger.debug('Chargement collection utilisateur');
@@ -678,10 +679,6 @@ onAuthStateChanged(auth, async (user) => {
             window.showPopup("Erreur", errorMessage);
         }
 
-<<<<<<< HEAD
-=======
-
-
         // 1. Charger la collection
         await fetchUserCollection(user.uid);
         
@@ -693,9 +690,7 @@ onAuthStateChanged(auth, async (user) => {
             const revealedCards = snap.data().boosterRevealedCards || [];
             openBoosterVisual(revealedCards);
         }
-        
 
-        
         // 3. Charger le classeur (Gen par défaut)
         await changeGen(); 
 
@@ -705,8 +700,6 @@ onAuthStateChanged(auth, async (user) => {
 
         // Fin du chargement
         if(loader) loader.style.display = 'none';
-
->>>>>>> codespace-congenial-space-tribble-v5g74p7vxv7c4rr
     } else {
         Logger.info('Utilisateur non connecté');
         // Déconnecté
@@ -1638,7 +1631,6 @@ async function checkCooldown(uid) {
         } else {
             // Calculer le temps restant avant la régénération complète
             const timeToNextPack = cooldownMs - diff;
-<<<<<<< HEAD
             // S'assurer que le timer n'est jamais négatif
             if (timeToNextPack > 0) {
                 startTimer(timeToNextPack, uid);
@@ -1646,14 +1638,10 @@ async function checkCooldown(uid) {
                 // Si le temps est déjà passé mais qu'on arrive ici, forcer la régénération
                 // (Ne devrait normalement pas arriver grâce au check ci-dessus)
                 availablePacks = await regeneratePacksForGen(uid, currentGen, packsByGen);
+                await updatePackQuantity();
                 updatePacksDisplay(availablePacks, true);
                 enableBoosterButton(true);
             }
-=======
-            startTimer(timeToNextPack, uid);
-            // Mettre à jour quand même l'affichage des packs (0)
-            await updatePackQuantity();
->>>>>>> codespace-congenial-space-tribble-v5g74p7vxv7c4rr
         }
     } else {
         enableBoosterButton(true);
@@ -1716,7 +1704,6 @@ function enableBoosterButton(enabled) {
     }
 }
 
-<<<<<<< HEAD
 // --- NOTIFICATIONS ---
 const NOTIFICATION_PACKS_READY_TITLE = "Poké-TCG - Packs disponibles ! 🎉";
 const NOTIFICATION_PACKS_READY_BODY = "Intéressant ! Vos packs sont maintenant disponibles. Revenez vite pour les ouvrir !";
@@ -1825,9 +1812,33 @@ function updateBellIcon() {
     if (Notification.permission === "granted") bell.classList.add('bell-active');
     else bell.classList.remove('bell-active');
 }
-=======
-// --- NOTIFICATIONS SUPPRIMÉES ---
->>>>>>> codespace-congenial-space-tribble-v5g74p7vxv7c4rr
+
+// Basculer la préférence de notifications utilisateur (BDD)
+window.toggleNotifications = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+        window.showPopup('Erreur', "Connectez-vous pour gérer les notifications.");
+        return;
+    }
+
+    try {
+        const snap = await getDoc(doc(db, 'players', user.uid));
+        const current = snap.exists() ? (snap.data().notificationsEnabled || false) : false;
+
+        if (current) {
+            // Désactiver
+            await setDoc(doc(db, 'players', user.uid), { notificationsEnabled: false }, { merge: true });
+            updateBellIcon();
+            window.showPopup('Notifications', 'Notifications désactivées.');
+        } else {
+            // Activer via la procédure existante
+            await window.requestNotification();
+        }
+    } catch (e) {
+        Logger.error('Erreur toggleNotifications', e);
+        window.showPopup('Erreur', 'Impossible de changer la préférence de notification.');
+    }
+};
 
 // --- AUTH HELPERS ---
 window.googleLogin = async () => {
