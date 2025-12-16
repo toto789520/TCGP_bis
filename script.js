@@ -366,9 +366,9 @@ window.showPopup = (title, msg) => {
         // Utiliser innerHTML pour supporter le formatage HTML
         // Utiliser popup-content si disponible, sinon popup-msg pour compatibilité
         const msgEl = document.getElementById('popup-content') || document.getElementById('popup-msg');
-        msgEl.innerHTML = msg.replace(/\n/g, '<br>');
+        // Ne pas remplacer les sauts de ligne par des <br> — laisser le rendu natif (white-space: pre-line)
+        msgEl.innerHTML = msg;
         msgEl.style.textAlign = 'left';
-        msgEl.style.whiteSpace = 'pre-line';
         el.style.display = 'flex';
     } else {
         alert(title + "\n" + msg.replace(/<[^>]*>/g, ''));
@@ -542,27 +542,27 @@ window.updatePackQuantity = async () => {
 window.showDropRates = () => {
     const packInfo = `
 <h3 class="h3-icon"><img src="assets/icons/gift.svg" class="icon-inline" alt="gift"><span>SYSTÈME DE PACKS :</span></h3>
-• Vous disposez de 3 packs maximum par génération
-• Les 3 packs se régénèrent toutes les ${COOLDOWN_MINUTES} minutes
-• Vous pouvez ouvrir plusieurs packs d'un coup
-• Chaque génération a son propre cooldown indépendant
+<ul><li>• Vous disposez de 3 packs maximum par génération</li>
+<li>• Les 3 packs se régénèrent toutes les ${COOLDOWN_MINUTES} minutes</li>
+<li>• Vous pouvez ouvrir plusieurs packs d'un coup</li>
+<li>• Chaque génération a son propre cooldown indépendant</li></ul>
 
 <h3 class="h3-icon"><img src="assets/icons/dices.svg" class="icon-inline" alt="dices"><span>TAILLE DU PACK :</span></h3>
-• 75% de chance d'obtenir 4 cartes
-• 25% de chance d'obtenir 5 cartes
+<ul><li>• 75% de chance d'obtenir 4 cartes</li>
+<li>• 25% de chance d'obtenir 5 cartes</li></ul>
 
 <h3 class="h3-icon"><img src="assets/icons/chart-column.svg" class="icon-inline" alt="chart"><span>PROBABILITÉS DE RARETÉ (Cartes 1-4) :</span></h3>
-• <span class="dot dot-common">⬤</span> Commune : 56%
-• <span class="dot dot-uncommon">⬤</span> Peu Commune : 26%
-• <span class="dot dot-rare">⬤</span> Rare : 14%
-• <span class="dot dot-ultra">⬤</span> Ultra Rare : 3.8%
-• <img src="assets/icons/star.svg" class="icon-inline" alt="secret"> Secrète : 0.2%
+<ul><li>• <span class="dot dot-common">⬤</span> Commune : 56%</li>
+<li>• <span class="dot dot-uncommon">⬤</span> Peu Commune : 26%</li>
+<li>• <span class="dot dot-rare">⬤</span> Rare : 14%</li>
+<li>• <span class="dot dot-ultra">⬤</span> Ultra Rare : 3.8%</li>
+<li>• <img src="assets/icons/star.svg" class="icon-inline" alt="secret"> Secrète : 0.2%</li></ul>
 
 <h3 class="h3-icon"><img src="assets/icons/star.svg" class="icon-inline" alt="star"><span>5ème CARTE (si pack de 5) :</span></h3>
-• <span class="dot dot-rare">⬤</span> Rare : 68%
-• <span class="dot dot-ultra">⬤</span> Ultra Rare : 30%
-• <img src="assets/icons/star.svg" class="icon-inline" alt="secret"> Secrète : 2%
-(Pas de commune ou peu commune)
+<ul><li>• <span class="dot dot-rare">⬤</span> Rare : 68%</li>
+<li>• <span class="dot dot-ultra">⬤</span> Ultra Rare : 30%</li>
+<li>• <img src="assets/icons/star.svg" class="icon-inline" alt="secret"> Secrète : 2%</li></ul>
+<p class="drop-note"><em>Pas de commune ou peu commune</em></p>
 
 <h3 class="h3-icon"><img src="assets/icons/octagon-x.svg" class="icon-inline" alt="limit"><span>LIMITE :</span></h3>
 Maximum 2 cartes identiques par pack
@@ -1007,9 +1007,9 @@ function renderBinder() {
     const displayOwned = showOwned ? showOwned.checked : true;
     const displayMissing = showMissing ? showMissing.checked : true;
 
-    // Préparer les données avec quantité possédée (ou mode admin)
+    // Préparer les données avec quantité possédée (toujours réelle)
     const cardsWithOwned = currentGenData.map(cardRef => {
-        const ownedCopies = adminShowAllMode ? 1 : userCollection.filter(c => c.id === cardRef.id).length;
+        const ownedCopies = userCollection.filter(c => c.id === cardRef.id).length;
         return { ...cardRef, ownedCopies };
     });
 
@@ -1026,8 +1026,8 @@ function renderBinder() {
         if (isOwned && !displayOwned) return false;
         if (!isOwned && !displayMissing) return false;
         
-        // Ne pas montrer les secrètes non possédées
-        if (!isOwned && cardRef.rarityKey === 'secret') return false;
+        // Ne pas montrer les secrètes non possédées (sauf en preview admin)
+        if (!isOwned && cardRef.rarityKey === 'secret' && !adminShowAllMode) return false;
         
         return true;
     });
@@ -1066,7 +1066,7 @@ function renderBinder() {
         const rarity = cardRef.rarityKey || 'common';
         if (rarityStats[rarity]) {
             rarityStats[rarity].total++;
-            const ownedCount = adminShowAllMode ? 1 : userCollection.filter(c => c.id === cardRef.id).length;
+            const ownedCount = userCollection.filter(c => c.id === cardRef.id).length;
             if (ownedCount > 0) rarityStats[rarity].owned++;
         }
     });
@@ -1148,26 +1148,27 @@ function renderBinder() {
     
     // Message si aucun résultat
         if (filteredCards.length === 0) {
-        grid.innerHTML = '<div style="color: #999; text-align: center; width: 100%; padding: 40px; font-size: 1.2rem;"> <img src="assets/icons/x.svg" class="icon-inline" alt="x"> Aucune carte ne correspond aux filtres</div>';
+        grid.innerHTML = '<div style="color: #999; text-align: center; padding: 40px; font-size: 1.2rem;"> <img src="assets/icons/x.svg" class="icon-inline" alt="x"> Aucune carte ne correspond aux filtres</div>';
         return;
     }
 
     filteredCards.forEach(cardRef => {
         const ownedCopies = cardRef.ownedCopies;
-        
-        if (ownedCopies > 0) {
-            // --- CARTE POSSÉDÉE ---
-            // En mode admin, on utilise cardRef directement
-            // Sinon on cherche dans la collection utilisateur
-            const userCard = adminShowAllMode ? cardRef : userCollection.find(c => c.id === cardRef.id);
-            // On force la rareté correcte (au cas où)
+
+        // Render full card face if owned OR if admin preview is active (simulate view-only)
+        if (ownedCopies > 0 || adminShowAllMode) {
+            // If owned, show the user's copy; otherwise show the gen card data for preview
+            const userCard = ownedCopies > 0 ? userCollection.find(c => c.id === cardRef.id) : cardRef;
             const cardToRender = userCard ? { ...userCard, rarityKey: cardRef.rarityKey } : cardRef;
-            
+
             // Calculer le total de cartes de cette génération
             const totalCards = currentGenData.length;
-            
+
+            // Pass ownedCopies (0 if not actually owned) so the UI still reflects real ownership counts
             const el = createCardElement(cardToRender, ownedCopies, cardRef.displayId, totalCards);
-            
+
+            // Preview-only visual marker removed (no class added)
+
             grid.appendChild(el);
         } else {
             // --- CARTE MANQUANTE (PLACEHOLDER) ---

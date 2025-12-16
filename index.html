@@ -137,9 +137,12 @@
                     <div class="points-progress-fill" id="points-progress-fill" style="width: 0%;"></div>
                 </div>
                 <div id="bonus-packs-info" class="bonus-packs-info" style="display: none;">
-                    <button onclick="useBonusPack()" class="btn-primary" style="width: 100%; margin-top: 10px; display:flex; align-items: center; justify-content: center; border: none;">
-                        <img src="assets/icons/gift.svg" class="title-icon" alt="gift" style="margin-right: 10px; filter: brightness(0) saturate(100%) invert(0%) sepia(0%) saturate(7476%) hue-rotate(285deg) brightness(94%) contrast(97%);"> Utiliser vos boosters bonus (<span id="bonus-packs-count">0</span>&nbsp;disponible<span id="bonus-plural">s</span>)
-                    </button>
+                        <button onclick="useBonusPack()" class="btn-primary" style="width: 100%; margin-top: 10px; display:flex; align-items: center; justify-content: center; border: none;">
+                            <div class="bonus-btn-content" style="white-space: nowrap;">
+                                <img src="assets/icons/gift.svg" class="title-icon" alt="gift" style="margin-right: 10px; filter: brightness(0) saturate(100%) invert(0%) sepia(0%) saturate(7476%) hue-rotate(285deg) brightness(94%) contrast(97%);">
+                                <span>Utiliser vos boosters bonus (<span id="bonus-packs-count">0</span>&nbsp;disponible<span id="bonus-plural">s</span>)</span>
+                            </div>
+                        </button>
                 </div>
             </div>
             

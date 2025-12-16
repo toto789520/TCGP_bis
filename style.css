@@ -16,6 +16,19 @@ html, body {
     color: white; overflow-x: hidden;
 }
 
+/* Global word-break / wrapping rules to avoid awkward line breaks */
+* {
+    word-wrap: break-word;       /* legacy */
+    overflow-wrap: anywhere;     /* modern */
+    -webkit-hyphens: auto;
+    hyphens: auto;
+}
+
+/* Button inner content helper to keep icon + text on one line */
+.bonus-btn-content {
+    display: inline-flex; align-items: center; gap: 10px; white-space: nowrap;
+}
+
 /* --- LOADERS & OVERLAYS --- */
 #global-loader, #auth-overlay, #booster-overlay, #custom-popup-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -472,7 +485,7 @@ img:not(.icon-inline):not(.title-icon):not(.card-img):not(.logo-img) { max-width
     gap: 12px;
     justify-content: center;
     flex-wrap: wrap;
-    margin: 15px 0;
+    margin: 15px;
     padding: 15px;
     background: linear-gradient(135deg, rgba(59, 76, 202, 0.1) 0%, rgba(0, 0, 0, 0.3) 100%);
     border-radius: 15px;
@@ -616,7 +629,7 @@ img:not(.icon-inline):not(.title-icon):not(.card-img):not(.logo-img) { max-width
 
 /* --- TOOLBAR --- */
 .toolbar {
-    max-width: 1400px; margin: 20px auto; padding: 15px;
+    max-width: 1400px; margin: 15px; padding: 15px;
     background: linear-gradient(180deg, #2c3e50 0%, #1a252f 100%);
     border: 2px solid var(--primary); border-radius: 15px;
     display: flex; gap: 15px;
@@ -1037,6 +1050,17 @@ td:nth-child(5) > div { display: flex; gap: 5px; flex-wrap: wrap; align-items: c
     filter: brightness(0) saturate(100%) invert(76%) sepia(44%) saturate(2512%) hue-rotate(93deg) brightness(92%) contrast(101%) !important;
 }
 
+/* Preview-only card styling (admin preview of missing cards) */
+.preview-missing {
+    opacity: 0.9;
+    filter: grayscale(20%) brightness(0.95);
+    position: relative;
+}
+.preview-missing::after {
+    /* Label removed: no content */
+    display: none;
+}
+
 /* Boutons d'action admin */
 .btn-action { 
     border: none; 
@@ -1161,11 +1185,14 @@ td:nth-child(5) > div { display: flex; gap: 5px; flex-wrap: wrap; align-items: c
     flex-shrink: 0;
 }
 .popup-content {
+    display: flex;
+    flex-direction: column;
     overflow-y: auto;
     overflow-x: hidden;
     flex: 1;
     text-align: left;
     min-height: 0;
+    gap:10px;
 }
 .popup-content button {
     z-index: 10;
@@ -1192,6 +1219,18 @@ td:nth-child(5) > div { display: flex; gap: 5px; flex-wrap: wrap; align-items: c
     margin: 20px 0 10px 0; 
     text-align: left;
     font-weight: bold;
+}
+
+/* Reset native list styles inside popup content for consistent formatting */
+.popup-content ul {
+    list-style: none;
+    margin-block-start: 0;
+    margin-block-end: 0;
+    padding-inline-start: 0;
+}
+.popup-content li {
+    margin: 0.25rem 0;
+    padding: 0;
 }
 .popup-content h3:first-child { margin-top: 0; }
 
@@ -1282,6 +1321,10 @@ td:nth-child(5) > div { display: flex; gap: 5px; flex-wrap: wrap; align-items: c
 
 /* Très petits écrans (< 480px) - Smartphones en portrait */
 @media (max-width: 479px) {
+    .rarity-stats-container, .points-progress-container {
+        margin: 10px;
+    }
+
     nav {
         flex-direction: column;
         padding: 10px 15px;
@@ -1476,6 +1519,11 @@ td:nth-child(5) > div { display: flex; gap: 5px; flex-wrap: wrap; align-items: c
         padding: 12px;
         margin: 15px;
     }
+
+    .rarity-stats-container {
+        padding: 12px;
+        margin: 15px;
+    }
     
     .search-container,
     .sort-container {
@@ -1538,7 +1586,7 @@ td:nth-child(5) > div { display: flex; gap: 5px; flex-wrap: wrap; align-items: c
         width: 380px;
     }
     
-    .toolbar {
+    .toolbar, .rarity-stats-container {
         flex-wrap: wrap;
         padding: 13px;
         margin: 18px;
@@ -1581,12 +1629,7 @@ td:nth-child(5) > div { display: flex; gap: 5px; flex-wrap: wrap; align-items: c
 }
 
 /* Petits desktops / grandes tablettes (1024px - 1279px) */
-@media (min-width: 1024px) and (max-width: 1279px) {
-    .toolbar {
-        padding: 14px;
-        margin: 19px auto;
-    }
-    
+@media (min-width: 1024px) and (max-width: 1279px) {    
     .grid-container {
         grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
         gap: 22px;
@@ -1758,4 +1801,13 @@ td:nth-child(5) > div { display: flex; gap: 5px; flex-wrap: wrap; align-items: c
 
 .popup-msg h3 {
     margin-bottom: 0;
+}
+
+/* Small italic, slightly muted note used in pack info popups */
+.drop-note {
+    font-style: italic;
+    font-size: 0.9rem;
+    opacity: 0.75;
+    margin: 0.25rem 0 0.6rem 0.6rem;
+    color: rgba(255,255,255,0.95);
 }
