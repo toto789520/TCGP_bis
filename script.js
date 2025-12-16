@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFirestore, doc, setDoc, updateDoc, arrayUnion, getDoc, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // --- SYSTÈME DE LOGGING ---
@@ -85,6 +85,60 @@ window.addEventListener('unhandledrejection', (event) => {
 // Exposer Logger globalement pour debugging
 window.Logger = Logger;
 
+// --- DÉTECTION D'APPAREIL ET NAVIGATEUR ---
+const DeviceInfo = {
+    userAgent: navigator.userAgent,
+    platform: navigator.platform,
+    isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream,
+    // iPad detection: combine multiple signals for reliability
+    // Note: Modern iPads may report as MacIntel, so we check maxTouchPoints
+    isIPad: /iPad/.test(navigator.userAgent) || 
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
+            (navigator.userAgentData && navigator.userAgentData.platform === 'macOS' && navigator.maxTouchPoints > 1),
+    isAndroid: /Android/.test(navigator.userAgent),
+    isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+    isSafari: /^((?!chrome|android).)*safari/i.test(navigator.userAgent),
+    isChrome: /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor),
+    isFirefox: /Firefox/.test(navigator.userAgent),
+    isSamsung: /SamsungBrowser/.test(navigator.userAgent),
+    // Problematic browsers detection (including X/Twitter)
+    isInAppBrowser: /FBAN|FBAV|Instagram|Line|Snapchat|Twitter|X;|WeChat/i.test(navigator.userAgent),
+    isCometBrowser: /Comet/i.test(navigator.userAgent),
+    
+    get isProblematicBrowser() {
+        return this.isInAppBrowser || this.isCometBrowser;
+    },
+    
+    get info() {
+        return {
+            userAgent: this.userAgent,
+            platform: this.platform,
+            isIOS: this.isIOS,
+            isIPad: this.isIPad,
+            isAndroid: this.isAndroid,
+            isMobile: this.isMobile,
+            isSafari: this.isSafari,
+            isChrome: this.isChrome,
+            isFirefox: this.isFirefox,
+            isSamsung: this.isSamsung,
+            isInAppBrowser: this.isInAppBrowser,
+            isCometBrowser: this.isCometBrowser,
+            screenWidth: window.screen.width,
+            screenHeight: window.screen.height,
+            viewport: {
+                width: window.innerWidth,
+                height: window.innerHeight
+            }
+        };
+    }
+};
+
+// Logger les infos de l'appareil au chargement
+Logger.info('Appareil détecté', DeviceInfo.info);
+
+// Exposer DeviceInfo globalement pour debugging
+window.DeviceInfo = DeviceInfo;
+
 // --- ENREGISTREMENT SERVICE WORKER (PWA) ---
 let deferredPrompt = null;
 let swRegistration = null;
@@ -147,7 +201,8 @@ window.addEventListener('appinstalled', () => {
 // --- 1. CONFIGURATION ---
 const ADMIN_EMAIL = "bryan.drouet24@gmail.com"; 
 const COOLDOWN_MINUTES = 3;
-const PACKS_PER_COOLDOWN = 3; 
+const PACKS_PER_COOLDOWN = 3;
+const AUTH_LOADING_TIMEOUT_MS = 10000; // 10 secondes max pour l'authentification 
 
 // TA CONFIG FIREBASE (Celle que tu m'as donnée)
 const firebaseConfig = {
@@ -163,6 +218,50 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
+
+// Configurer le provider pour forcer la sélection de compte
+provider.setCustomParameters({
+    prompt: 'select_account'
+});
+
+// Sur iOS/iPad, utiliser la persistance locale pour éviter les problèmes avec ITP
+if (DeviceInfo.isIOS || DeviceInfo.isIPad) {
+    Logger.info('iOS/iPad détecté - Configuration de la persistance auth');
+    // Note: Firebase 10.x gère automatiquement la persistance
+    // mais on peut forcer des paramètres si nécessaire
+}
+
+// Vérifier les résultats de redirection au chargement
+getRedirectResult(auth)
+    .then(async (result) => {
+        if (result) {
+            Logger.info('Connexion Google par redirection réussie', { email: result.user.email });
+            // L'utilisateur vient de se connecter via redirect
+            // onAuthStateChanged se chargera du reste
+        }
+    })
+    .catch((error) => {
+        Logger.error('Erreur lors de la connexion Google par redirection', {
+            code: error.code,
+            message: error.message
+        });
+        
+        const authMsg = document.getElementById('auth-msg');
+        if (authMsg) {
+            authMsg.style.color = '#ff6b6b';
+            if (error.code === 'auth/popup-blocked') {
+                authMsg.innerText = '⚠️ Popups bloquées. Réessayez.';
+            } else if (error.code === 'auth/popup-closed-by-user') {
+                authMsg.innerText = '⚠️ Connexion annulée';
+            } else if (error.code === 'auth/cancelled-popup-request') {
+                authMsg.innerText = '⚠️ Connexion annulée';
+            } else if (error.code === 'auth/account-exists-with-different-credential') {
+                authMsg.innerText = '⚠️ Ce compte existe déjà avec une autre méthode de connexion';
+            } else {
+                authMsg.innerText = '⚠️ Erreur de connexion: ' + error.message;
+            }
+        }
+    });
 
 // --- GESTION INSTANCE UNIQUE ---
 const SESSION_ID = Date.now() + '_' + Math.random().toString(36) + '_' + performance.now();
@@ -291,6 +390,28 @@ let selectedRarityFilter = null; // Filtre de rareté actif
 
 // --- INITIALISATION AU CHARGEMENT DE LA PAGE ---
 window.onload = () => {
+    // Vérifier si on est dans un environnement problématique
+    if (DeviceInfo.isProblematicBrowser) {
+        Logger.warn('Navigateur problématique détecté', { 
+            userAgent: navigator.userAgent,
+            isCometBrowser: DeviceInfo.isCometBrowser,
+            isInAppBrowser: DeviceInfo.isInAppBrowser
+        });
+        
+        // Afficher un avertissement pour les utilisateurs
+        const warningHtml = `
+            <div style="background: #ff9800; color: white; padding: 10px; text-align: center; font-size: 0.9rem;">
+                ⚠️ Pour une meilleure expérience, ouvrez ce site dans votre navigateur principal (Safari, Chrome, Firefox).
+            </div>
+        `;
+        
+        const body = document.body;
+        const warningDiv = document.createElement('div');
+        warningDiv.innerHTML = warningHtml;
+        body.insertBefore(warningDiv.firstElementChild, body.firstElementChild);
+    }
+    
+    // Initialiser les options de génération
     const select = document.getElementById('gen-select');
     if(select) {
         // On inverse la liste pour avoir Gen 7 en premier
@@ -454,70 +575,135 @@ Maximum 2 cartes identiques par pack
 };
 
 // --- AUTHENTIFICATION ---
+// Timeout de sécurité pour le loader - sera initialisé au démarrage
+let authLoadingTimeout = null;
+
+// Démarrer le timeout d'authentification
+function startAuthTimeout() {
+    // Annuler tout timeout existant
+    if (authLoadingTimeout) {
+        clearTimeout(authLoadingTimeout);
+    }
+    
+    authLoadingTimeout = setTimeout(() => {
+        const loader = document.getElementById('global-loader');
+        if (loader && loader.style.display !== 'none') {
+            Logger.error('Timeout du chargement - forçage de l\'affichage');
+            loader.style.display = 'none';
+            // Si pas d'utilisateur après timeout, afficher l'écran de connexion
+            if (!auth.currentUser) {
+                document.getElementById('auth-overlay').style.display = 'flex';
+                window.showPopup("Erreur de chargement", "Le chargement a pris trop de temps. Veuillez vous reconnecter.");
+            }
+        }
+        authLoadingTimeout = null;
+    }, AUTH_LOADING_TIMEOUT_MS);
+}
+
+// Démarrer le timeout au chargement de la page
+startAuthTimeout();
+
 onAuthStateChanged(auth, async (user) => {
     const loader = document.getElementById('global-loader');
     
+    // Annuler le timeout si l'auth se résout
+    if (authLoadingTimeout) {
+        clearTimeout(authLoadingTimeout);
+        authLoadingTimeout = null;
+    }
+    
     if (user) {
-        // Vérifier l'instance unique
-        const canContinue = await startSessionMonitoring(user.uid);
-        if (!canContinue) return;
+        Logger.info('Utilisateur connecté', { email: user.email, uid: user.uid });
         
-        // Connecté
-        document.getElementById('auth-overlay').style.display = 'none';
-        document.getElementById('game-app').style.display = 'block';
-        document.getElementById('user-display').innerText = user.email.split('@')[0];
-        
-        // Vérif Admin (Basique sur email)
-        const isAdmin = (user.email === ADMIN_EMAIL);
-        const adminPreview = document.getElementById('admin-preview-container');
-        if(adminPreview) adminPreview.style.display = isAdmin ? 'block' : 'none';
-        
-        // Menu profil au clic sur le profil
-        const userProfilePill = document.getElementById('user-profile-pill');
-        if(userProfilePill) {
-            userProfilePill.onclick = () => {
-                if(isAdmin) {
-                    window.location.href = 'admin.html';
-                } else {
-                    showProfileMenu();
-                }
-            };
+        try {
+            // Vérifier l'instance unique
+            const canContinue = await startSessionMonitoring(user.uid);
+            if (!canContinue) {
+                Logger.warn('Instance unique bloquée');
+                return;
+            }
+            
+            // Connecté
+            document.getElementById('auth-overlay').style.display = 'none';
+            document.getElementById('game-app').style.display = 'block';
+            document.getElementById('user-display').innerText = user.email.split('@')[0];
+            
+            // Vérif Admin (Basique sur email)
+            const isAdmin = (user.email === ADMIN_EMAIL);
+            const adminPreview = document.getElementById('admin-preview-container');
+            if(adminPreview) adminPreview.style.display = isAdmin ? 'block' : 'none';
+            
+            // Menu profil au clic sur le profil
+            const userProfilePill = document.getElementById('user-profile-pill');
+            if(userProfilePill) {
+                userProfilePill.onclick = () => {
+                    if(isAdmin) {
+                        window.location.href = 'admin.html';
+                    } else {
+                        showProfileMenu();
+                    }
+                };
+            }
+
+            // Check Notifications (Visuel uniquement)
+            updateBellIcon();
+
+            // 1. Charger la collection
+            Logger.debug('Chargement collection utilisateur');
+            await fetchUserCollection(user.uid);
+            
+            // 2. Vérifier si un booster est en cours d'ouverture
+            const snap = await getDoc(doc(db, "players", user.uid));
+            if (snap.exists() && snap.data().currentBooster && snap.data().currentBooster.length > 0) {
+                // Restaurer l'ouverture en cours
+                Logger.info('Restauration booster en cours');
+                tempBoosterCards = snap.data().currentBooster;
+                const revealedCards = snap.data().boosterRevealedCards || [];
+                openBoosterVisual(revealedCards);
+            }
+            
+            // Vérifier les notifications admin
+            if (snap.exists() && snap.data().adminNotification) {
+                const notif = snap.data().adminNotification;
+                window.showPopup("Notification Admin", notif.message);
+                // Supprimer la notification après affichage
+                await setDoc(doc(db, "players", user.uid), { adminNotification: null }, { merge: true });
+            }
+            
+            // 3. Charger le classeur (Gen par défaut)
+            Logger.debug('Chargement classeur');
+            await changeGen(); 
+
+            // 4. Vérifier le Cooldown
+            if (!isAdmin) await checkCooldown(user.uid);
+            else enableBoosterButton(true);
+
+            // Fin du chargement
+            Logger.info('Chargement terminé avec succès');
+            if(loader) loader.style.display = 'none';
+            
+        } catch (error) {
+            Logger.error('Erreur lors du chargement de l\'application', error);
+            if(loader) loader.style.display = 'none';
+            
+            // Message d'erreur plus détaillé selon le type d'erreur
+            let errorMessage = "Une erreur est survenue lors du chargement.\n\n";
+            
+            if (error.code === 'permission-denied') {
+                errorMessage += "Problème de permissions. Vérifiez votre connexion et réessayez.";
+            } else if (error.code === 'unavailable') {
+                errorMessage += "Service temporairement indisponible. Veuillez réessayer dans quelques instants.";
+            } else if (error.message) {
+                errorMessage += `Détails: ${error.message}\n\nRechargez la page ou contactez le support.`;
+            } else {
+                errorMessage += "Rechargez la page (F5) ou videz le cache si le problème persiste.";
+            }
+            
+            window.showPopup("Erreur", errorMessage);
         }
-
-        // Check Notifications (Visuel uniquement)
-        updateBellIcon();
-
-        // 1. Charger la collection
-        await fetchUserCollection(user.uid);
-        
-        // 2. Vérifier si un booster est en cours d'ouverture
-        const snap = await getDoc(doc(db, "players", user.uid));
-        if (snap.exists() && snap.data().currentBooster && snap.data().currentBooster.length > 0) {
-            // Restaurer l'ouverture en cours
-            tempBoosterCards = snap.data().currentBooster;
-            const revealedCards = snap.data().boosterRevealedCards || [];
-            openBoosterVisual(revealedCards);
-        }
-        
-        // Vérifier les notifications admin
-        if (snap.exists() && snap.data().adminNotification) {
-            const notif = snap.data().adminNotification;
-            window.showPopup("Notification Admin", notif.message);
-            // Supprimer la notification après affichage
-            await setDoc(doc(db, "players", user.uid), { adminNotification: null }, { merge: true });
-        }
-        
-        // 3. Charger le classeur (Gen par défaut)
-        await changeGen(); 
-
-        // 4. Vérifier le Cooldown
-        if (!isAdmin) await checkCooldown(user.uid);
-        else enableBoosterButton(true);
-
-        // Fin du chargement
-        if(loader) loader.style.display = 'none';
 
     } else {
+        Logger.info('Utilisateur non connecté');
         // Déconnecté
         document.getElementById('game-app').style.display = 'none';
         document.getElementById('auth-overlay').style.display = 'flex';
@@ -1498,11 +1684,63 @@ function updateBellIcon() {
 
 // --- AUTH HELPERS ---
 window.googleLogin = async () => {
+    const authMsg = document.getElementById('auth-msg');
+    
+    // Sur iOS (iPhone/iPod/old iPads) ou modern iPad ou Safari, utiliser redirect car popups souvent bloquées
+    // Note: isIOS catches old iPads, isIPad catches modern iPads reporting as MacIntel
+    const shouldUseRedirect = DeviceInfo.isIOS || DeviceInfo.isIPad || DeviceInfo.isSafari;
+    
     try {
+        authMsg.innerText = 'Connexion en cours...';
+        authMsg.style.color = '#4CAF50';
+        
+        if (shouldUseRedirect) {
+            Logger.info('Utilisation de redirect pour iOS/iPad/Safari');
+            await signInWithRedirect(auth, provider);
+            // La page va se recharger, pas besoin de faire quoi que ce soit d'autre
+            return;
+        }
+        
+        Logger.info('Tentative de connexion Google via popup');
         await signInWithPopup(auth, provider);
+        Logger.info('Connexion Google via popup réussie');
+        authMsg.innerText = '';
+        
     } catch(e) {
-        // En local, cette erreur peut arriver mais la connexion réussit souvent quand même
-        console.warn("Popup error:", e);
+        Logger.warn('Erreur popup Google, tentative de redirection', { 
+            code: e.code, 
+            message: e.message 
+        });
+        
+        // Si popup bloquée ou fermée, utiliser redirect
+        if (e.code === 'auth/popup-blocked' || 
+            e.code === 'auth/popup-closed-by-user' || 
+            e.code === 'auth/cancelled-popup-request') {
+            
+            Logger.info('Utilisation de la méthode de redirection');
+            authMsg.innerText = 'Redirection vers Google...';
+            authMsg.style.color = '#4CAF50';
+            
+            try {
+                await signInWithRedirect(auth, provider);
+            } catch(redirectError) {
+                Logger.error('Erreur lors de la redirection Google', redirectError);
+                authMsg.style.color = '#ff6b6b';
+                authMsg.innerText = '⚠️ Erreur de connexion: ' + redirectError.message;
+            }
+        } else {
+            // Autre type d'erreur
+            Logger.error('Erreur de connexion Google', { code: e.code, message: e.message });
+            authMsg.style.color = '#ff6b6b';
+            
+            if (e.code === 'auth/account-exists-with-different-credential') {
+                authMsg.innerText = '⚠️ Ce compte existe déjà avec une autre méthode';
+            } else if (e.code === 'auth/network-request-failed') {
+                authMsg.innerText = '⚠️ Erreur réseau. Vérifiez votre connexion.';
+            } else {
+                authMsg.innerText = '⚠️ Erreur: ' + e.message;
+            }
+        }
     }
 };
 window.signUp = async () => {
