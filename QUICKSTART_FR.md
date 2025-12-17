@@ -10,11 +10,19 @@
 
 ### Étape 2: Configurer le projet (1 min)
 
+**Important**: Pour la sécurité, le fichier `supabase-config.js` est maintenant dans `.gitignore`. 
+
 Éditez `supabase-config.js` et remplacez:
 ```javascript
 anonKey: 'YOUR_SUPABASE_ANON_KEY_HERE'
 ```
 par votre clé (collez la clé copiée à l'étape 1).
+
+💡 **Astuce**: Si le fichier n'existe pas, copiez `supabase-config.js.template`:
+```bash
+cp supabase-config.js.template supabase-config.js
+```
+Puis éditez-le avec votre clé.
 
 ### Étape 3: Créer les tables (2 min)
 
