@@ -227,6 +227,7 @@
 
                 let imported = 0;
                 let errors = 0;
+                let skipped = 0;
 
                 for (let i = 0; i < players.length; i++) {
                     const player = players[i];
@@ -265,13 +266,14 @@
                                 .from('players')
                                 .update(playerData)
                                 .eq('id', existing.id);
+                            imported++;
                         } else {
                             // Create note: this will fail without user_id, 
                             // users need to login first to create auth accounts
                             console.log(`Skipping ${player.email} - user must login first`);
+                            skipped++;
                         }
 
-                        imported++;
                         updateProgress(Math.round((i + 1) / players.length * 100));
                     } catch (err) {
                         console.error(`Erreur pour ${player.email}:`, err);
@@ -281,14 +283,15 @@
 
                 updateProgress(100);
                 showStatus(
-                    `✅ Migration terminée ! ${imported} joueurs traités, ${errors} erreurs.
+                    `✅ Migration terminée ! ${imported} joueurs mis à jour, ${skipped} ignorés (doivent se connecter d'abord), ${errors} erreurs.
                     
-                    ⚠️ Note: Les joueurs doivent se reconnecter pour lier leurs comptes Supabase Auth.`,
+                    ⚠️ Note: Les ${skipped} joueurs ignorés doivent se connecter pour créer leurs comptes Supabase Auth.`,
                     'success'
                 );
                 document.getElementById('stats').innerHTML = `
                     <strong>Import terminé :</strong><br>
-                    ✅ ${imported} joueurs traités<br>
+                    ✅ ${imported} joueurs mis à jour<br>
+                    ⏭️ ${skipped} joueurs ignorés (doivent se connecter)<br>
                     ${errors > 0 ? `❌ ${errors} erreurs<br>` : ''}
                     📧 Les utilisateurs doivent se reconnecter pour activer leur compte
                 `;

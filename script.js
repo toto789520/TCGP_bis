@@ -395,6 +395,9 @@ function getSession() {
     return supabase.auth.getSession().then(({ data }) => data.session);
 }
 
+// Supabase error codes
+const SUPABASE_ERROR_NOT_FOUND = 'PGRST116'; // PostgreSQL REST error: row not found
+
 // Supabase database helpers
 async function getPlayerDoc(uid) {
     const { data, error } = await supabase
@@ -403,7 +406,7 @@ async function getPlayerDoc(uid) {
         .eq('user_id', uid)
         .single();
     
-    if (error && error.code !== 'PGRST116') { // PGRST116 = not found
+    if (error && error.code !== SUPABASE_ERROR_NOT_FOUND) {
         console.error('Error fetching player:', error);
         throw error;
     }
@@ -726,7 +729,9 @@ window.resetAccount = async () => {
             collection: [],
             packs_by_gen: {},
             current_booster: [],
-            booster_revealed_cards: []
+            booster_revealed_cards: [],
+            last_draw_time: 0,
+            available_packs: PACKS_PER_COOLDOWN
         }, { merge: true });
         
         closePopup();
@@ -759,7 +764,10 @@ window.deleteAccount = async () => {
         await supabase.auth.signOut();
         
         closePopup();
-        window.showPopup("<img src='assets/icons/check.svg' class='icon-inline' alt='ok'> Données supprimées", "Vos données ont été supprimées. Pour supprimer complètement votre compte, contactez un administrateur.");
+        window.showPopup(
+            "<img src='assets/icons/check.svg' class='icon-inline' alt='ok'> Données supprimées",
+            "Vos données de jeu ont été supprimées de l'application. Votre compte d'authentification (utilisé pour vous connecter) n'est pas supprimé automatiquement : pour supprimer entièrement ce compte, contactez un administrateur."
+        );
         setTimeout(() => location.reload(), 3000);
     } catch (e) {
         if (e.message && e.message.includes('session')) {
@@ -1764,10 +1772,8 @@ window.drawCard = async (overridePackQuantity = null, options = {}) => {
         // Mettre à jour l'affichage du nombre de packs disponibles
         await updatePackQuantity();
         
-        // Afficher un message si un booster bonus a été gagné
-        if (earnedBonusPacks > 0) {
-            window.showPopup("<img src='assets/icons/gift.svg' class='icon-inline' alt='gift'> Booster Bonus!", `Vous avez gagné ${earnedBonusPacks} booster(s) bonus avec vos points !`);
-        }
+        // Stocker le nombre de boosters bonus gagnés pour l'afficher après la fermeture
+        window._earnedBonusPacksThisOpen = earnedBonusPacks;
 
         // Gestion Timer
         if (!isAdmin) {
@@ -2052,6 +2058,18 @@ window.closeBooster = async () => {
 
     // Recharger le binder pour montrer les nouvelles cartes
     renderBinder();
+    
+    // Afficher le popup de bonus packs si des packs ont été gagnés durant cette ouverture
+    if (window._earnedBonusPacksThisOpen && window._earnedBonusPacksThisOpen > 0) {
+        const earnedCount = window._earnedBonusPacksThisOpen;
+        window._earnedBonusPacksThisOpen = 0; // Reset pour la prochaine fois
+        
+        const bonusText = earnedCount === 1 ? 'booster bonus' : 'boosters bonus';
+        window.showPopup(
+            "🎁 Booster Bonus!",
+            `Félicitations ! Vous avez gagné ${earnedCount} ${bonusText} avec vos points !`
+        );
+    }
 };
 
 // --- COOLDOWN PAR GÉNÉRATION ---
