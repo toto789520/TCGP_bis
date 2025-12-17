@@ -1,5 +1,6 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { SUPABASE_CONFIG } from './supabase-config.js';
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore, doc, setDoc, updateDoc, arrayUnion, getDoc, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // --- SYSTÈME DE LOGGING ---
 const Logger = {
@@ -68,7 +69,7 @@ async function _flushPendingRevealed(uid) {
     clearTimeout(_saveBoosterTimer);
     _saveBoosterTimer = null;
     try {
-        await safeSetPlayerDoc(uid, { booster_revealed_cards: toSave }, { merge: true });
+        await safeSetPlayerDoc(uid, { boosterRevealedCards: toSave }, { merge: true });
     } catch (e) {
         console.error('Erreur sauvegarde (batch) révélation:', e);
     }
@@ -161,10 +162,10 @@ async function _processPlayerWriteQueue() {
                         const deduped = Array.from(new Map(items.map(c => [c && c.id ? c.id : JSON.stringify(c), c])).values());
                         items = deduped;
                     } catch (er) { /* fallback: use original items */ }
-                    await arrayUnionUpdate(item.uid, 'collection', items);
+                    await setDoc(doc(db, 'players', item.uid), { collection: arrayUnion(...items) }, { merge: true });
                 }
             } else {
-                await setPlayerDoc(item.uid, item.data, item.options || { merge: true });
+                await setDoc(doc(db, 'players', item.uid), item.data, item.options || { merge: true });
             }
             // success -> remove this item
             queue.splice(i, 1);
@@ -210,12 +211,12 @@ async function safeSetPlayerDoc(uid, data, options = { merge: true }) {
             return;
         }
 
-        await setPlayerDoc(uid, data, options);
+        await setDoc(doc(db, 'players', uid), data, options);
         window._lastPlayerWriteAt[uid] = Date.now();
     } catch (e) {
         const isQuota = (e && e.code && e.code === 'resource-exhausted') || (e && typeof e.message === 'string' && e.message.toLowerCase().includes('quota'));
         if (isQuota) {
-            console.warn('Quota dépassé — mise en file d\'attente de l\'écriture', { uid, data });
+            console.warn('Quota Firestore dépassé — mise en file d\'attente de l\'écriture', { uid, data });
             _enqueuePlayerWrite(uid, data, options);
         } else {
             // rethrow for other handlers
@@ -382,161 +383,20 @@ const POINTS_FOR_BONUS_PACK = 30;
 const BOOSTER_DELAY_SECONDS = 3;
 const AUTH_LOADING_TIMEOUT_MS = 10000; // 10 secondes max pour l'authentification
 
-// SUPABASE CONFIG
-const supabase = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+// TA CONFIG FIREBASE (Celle que tu m'as donnée)
+const firebaseConfig = {
+    apiKey: "AIzaSyBdtS508E3KBTZHfOTb7kl-XDc9vVn3oZI",
+    authDomain: "tcgp-27e34.firebaseapp.com",
+    projectId: "tcgp-27e34",
+    storageBucket: "tcgp-27e34.firebasestorage.app",
+    messagingSenderId: "7412987658",
+    appId: "1:7412987658:web:87f0a63b9b7c95548bacf3"
+};
 
-// Supabase error codes
-const SUPABASE_ERROR_NOT_FOUND = 'PGRST116'; // PostgreSQL REST error: row not found
-
-// Supabase database helpers
-async function getPlayerDoc(uid) {
-    const { data, error } = await supabase
-        .from('players')
-        .select('*')
-        .eq('user_id', uid)
-        .single();
-    
-    if (error && error.code !== SUPABASE_ERROR_NOT_FOUND) {
-        console.error('Error fetching player:', error);
-        throw error;
-    }
-    
-    return {
-        exists: () => !!data,
-        data: () => data || {}
-    };
-}
-
-async function setPlayerDoc(uid, updates, options = {}) {
-    let result;
-    
-    if (options.merge) {
-        // Only fetch existing data if merge is needed
-        const { data: existingData } = await supabase
-            .from('players')
-            .select('*')
-            .eq('user_id', uid)
-            .single();
-        
-        if (existingData) {
-            // Update existing record with merged data
-            const mergedData = { ...existingData, ...updates };
-            result = await supabase
-                .from('players')
-                .update(mergedData)
-                .eq('user_id', uid);
-        } else {
-            // Insert new record
-            result = await supabase
-                .from('players')
-                .insert({ ...updates, user_id: uid });
-        }
-    } else {
-        // Try to update first without fetching
-        result = await supabase
-            .from('players')
-            .update(updates)
-            .eq('user_id', uid);
-        
-        // If no rows updated, try to insert
-        if (result.status === 200 && result.statusText === 'OK' && !result.error) {
-            // Check if update actually affected rows by trying to fetch
-            const { data: check } = await supabase
-                .from('players')
-                .select('id')
-                .eq('user_id', uid)
-                .single();
-            
-            if (!check) {
-                // No existing record, insert new one
-                result = await supabase
-                    .from('players')
-                    .insert({ ...updates, user_id: uid });
-            }
-        }
-    }
-    
-    if (result.error) {
-        console.error('Error setting player doc:', result.error);
-        throw result.error;
-    }
-    
-    return result;
-}
-
-async function updatePlayerDoc(uid, updates) {
-    const { error } = await supabase
-        .from('players')
-        .update(updates)
-        .eq('user_id', uid);
-    
-    if (error) {
-        console.error('Error updating player:', error);
-        throw error;
-    }
-}
-
-async function deletePlayerDoc(uid) {
-    const { error } = await supabase
-        .from('players')
-        .delete()
-        .eq('user_id', uid);
-    
-    if (error) {
-        console.error('Error deleting player:', error);
-        throw error;
-    }
-}
-
-async function deleteSessionDoc(uid) {
-    const { error } = await supabase
-        .from('sessions')
-        .delete()
-        .eq('user_id', uid);
-    
-    if (error) {
-        console.error('Error deleting session:', error);
-        throw error;
-    }
-}
-
-async function getAllPlayers() {
-    const { data, error } = await supabase
-        .from('players')
-        .select('*')
-        .order('created_at', { ascending: false });
-    
-    if (error) {
-        console.error('Error fetching all players:', error);
-        throw error;
-    }
-    
-    return data || [];
-}
-
-// Helper to add items to array in JSONB column
-async function arrayUnionUpdate(uid, field, items) {
-    const { data: currentData } = await supabase
-        .from('players')
-        .select(field)
-        .eq('user_id', uid)
-        .single();
-    
-    if (!currentData) return;
-    
-    const currentArray = currentData[field] || [];
-    const newArray = [...currentArray, ...items];
-    
-    const { error } = await supabase
-        .from('players')
-        .update({ [field]: newArray })
-        .eq('user_id', uid);
-    
-    if (error) {
-        console.error(`Error updating ${field}:`, error);
-        throw error;
-    }
-}
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const provider = new GoogleAuthProvider();
 
 // Try to flush any queued player writes from previous sessions
 try {
@@ -545,27 +405,49 @@ try {
     console.warn('Impossible de lancer le flush de la queue au démarrage', e);
 }
 
+// Configurer le provider pour forcer la sélection de compte
+provider.setCustomParameters({
+    prompt: 'select_account'
+});
+
 // Sur iOS/iPad, utiliser la persistance locale pour éviter les problèmes avec ITP
 if (DeviceInfo.isIOS || DeviceInfo.isIPad) {
     Logger.info('iOS/iPad détecté - Configuration de la persistance auth');
+    // Note: Firebase 10.x gère automatiquement la persistance
+    // mais on peut forcer des paramètres si nécessaire
 }
 
-// Vérifier les résultats de redirection au chargement (Google OAuth)
-supabase.auth.getSession().then(async ({ data }) => {
-    if (data.session && data.session.provider_token) {
-        Logger.info('Connexion Google par redirection réussie');
-    }
-}).catch((error) => {
-    Logger.error('Erreur lors de la récupération de la session', {
-        message: error.message
+// Vérifier les résultats de redirection au chargement
+getRedirectResult(auth)
+    .then(async (result) => {
+        if (result) {
+            Logger.info('Connexion Google par redirection réussie', { email: result.user.email });
+            // L'utilisateur vient de se connecter via redirect
+            // onAuthStateChanged se chargera du reste
+        }
+    })
+    .catch((error) => {
+        Logger.error('Erreur lors de la connexion Google par redirection', {
+            code: error.code,
+            message: error.message
+        });
+        
+            const authMsg = document.getElementById('auth-msg');
+        if (authMsg) {
+            authMsg.style.color = '#ff6b6b';
+            if (error.code === 'auth/popup-blocked') {
+                    authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Popups bloquées. Réessayez.';
+            } else if (error.code === 'auth/popup-closed-by-user') {
+                    authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Connexion annulée';
+            } else if (error.code === 'auth/cancelled-popup-request') {
+                    authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Connexion annulée';
+            } else if (error.code === 'auth/account-exists-with-different-credential') {
+                    authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Ce compte existe déjà avec une autre méthode de connexion';
+            } else {
+                    authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Erreur de connexion: ' + error.message;
+            }
+        }
     });
-    
-    const authMsg = document.getElementById('auth-msg');
-    if (authMsg) {
-        authMsg.style.color = '#ff6b6b';
-        authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Erreur de connexion: ' + error.message;
-    }
-});
 
 // --- GESTION INSTANCE UNIQUE ---
 const SESSION_ID = Date.now() + '_' + Math.random().toString(36) + '_' + performance.now();
@@ -730,17 +612,15 @@ window.resetAccount = async () => {
         return;
     }
     
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth.currentUser;
     if (!user) return;
     
     try {
-        await safeSetPlayerDoc(user.id, {
+        await safeSetPlayerDoc(user.uid, {
             collection: [],
-            packs_by_gen: {},
-            current_booster: [],
-            booster_revealed_cards: [],
-            last_draw_time: 0,
-            available_packs: PACKS_PER_COOLDOWN
+            packsByGen: {},
+            currentBooster: [],
+            boosterRevealedCards: []
         }, { merge: true });
         
         closePopup();
@@ -760,29 +640,25 @@ window.deleteAccount = async () => {
         return;
     }
     
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth.currentUser;
     if (!user) return;
     
     try {
-        // Supprimer les données Supabase (players et sessions)
-        await deletePlayerDoc(user.id);
-        await deleteSessionDoc(user.id);
+        // Supprimer les données Firestore
+        await deleteDoc(doc(db, "players", user.uid));
+        await deleteDoc(doc(db, "sessions", user.uid));
         
-        // Déconnecter l'utilisateur (Supabase ne permet pas de supprimer son propre compte via le client)
-        // L'admin devra supprimer le compte Auth depuis le dashboard
-        await supabase.auth.signOut();
+        // Supprimer le compte Firebase Auth
+        await user.delete();
         
         closePopup();
-        window.showPopup(
-            "<img src='assets/icons/check.svg' class='icon-inline' alt='ok'> Données supprimées",
-            "Vos données de jeu ont été supprimées de l'application. Votre compte d'authentification (utilisé pour vous connecter) n'est pas supprimé automatiquement : pour supprimer entièrement ce compte, contactez un administrateur."
-        );
-        setTimeout(() => location.reload(), 3000);
+        window.showPopup("<img src='assets/icons/check.svg' class='icon-inline' alt='ok'> Compte supprimé", "Votre compte a été supprimé avec succès.");
+        setTimeout(() => location.reload(), 2000);
     } catch (e) {
-        if (e.message && e.message.includes('session')) {
+        if (e.code === 'auth/requires-recent-login') {
             window.showPopup("Erreur", "Vous devez vous reconnecter récemment pour supprimer votre compte. Déconnectez-vous et reconnectez-vous, puis réessayez.");
         } else {
-            window.showPopup("Erreur", "Impossible de supprimer les données: " + e.message);
+            window.showPopup("Erreur", "Impossible de supprimer le compte: " + e.message);
         }
     }
 };
@@ -792,24 +668,24 @@ window.updatePackQuantity = async () => {
     const select = document.getElementById('pack-quantity');
     const btn = document.getElementById('btn-draw');
     const quantity = parseInt(select.value) || 0; // Ensure quantity is a number
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth.currentUser;
     const isAdmin = user && (user.email === ADMIN_EMAIL);
     
     // Vérifier si l'utilisateur a assez de packs
-    let available_packs = PACKS_PER_COOLDOWN;
+    let availablePacks = PACKS_PER_COOLDOWN;
     if (user && !isAdmin && btn) {
         const genSelect = document.getElementById('gen-select');
         const selectedGen = genSelect.value;
         
         try {
-            const snap = await getPlayerDoc(user.id);
+            const snap = await getDoc(doc(db, "players", user.uid));
             if (snap.exists()) {
-                const packs_by_gen = snap.data().packs_by_gen || {};
-                const genData = packs_by_gen[selectedGen] || { available_packs: PACKS_PER_COOLDOWN };
-                available_packs = genData.available_packs ?? PACKS_PER_COOLDOWN;
+                const packsByGen = snap.data().packsByGen || {};
+                const genData = packsByGen[selectedGen] || { availablePacks: PACKS_PER_COOLDOWN };
+                availablePacks = genData.availablePacks ?? PACKS_PER_COOLDOWN;
                 
                 // Désactiver le bouton si pas assez de packs, sinon le réactiver
-                if (available_packs < quantity) {
+                if (availablePacks < quantity) {
                     btn.disabled = true;
                     btn.classList.add('disabled');
                 } else {
@@ -834,7 +710,7 @@ window.updatePackQuantity = async () => {
     // Mettre à jour l'affichage du nombre de packs disponibles
     const packsInfo = document.getElementById('packs-info');
     if (packsInfo && user && !isAdmin) {
-        packsInfo.textContent = `(${available_packs}/${PACKS_PER_COOLDOWN} disponibles)`;
+        packsInfo.textContent = `(${availablePacks}/${PACKS_PER_COOLDOWN} disponibles)`;
     }
 };
 
@@ -882,14 +758,13 @@ function startAuthTimeout() {
         clearTimeout(authLoadingTimeout);
     }
     
-    authLoadingTimeout = setTimeout(async () => {
+    authLoadingTimeout = setTimeout(() => {
         const loader = document.getElementById('global-loader');
         if (loader && loader.style.display !== 'none') {
             Logger.error('Timeout du chargement - forçage de l\'affichage');
             loader.style.display = 'none';
             // Si pas d'utilisateur après timeout, afficher l'écran de connexion
-            const { data } = await supabase.auth.getUser();
-            if (!data.user) {
+            if (!auth.currentUser) {
                 document.getElementById('auth-overlay').style.display = 'flex';
                 window.showPopup("Erreur de chargement", "Le chargement a pris trop de temps. Veuillez vous reconnecter.");
             }
@@ -901,7 +776,7 @@ function startAuthTimeout() {
 // Démarrer le timeout au chargement de la page
 startAuthTimeout();
 
-supabase.auth.onAuthStateChange(async (event, session) => {
+onAuthStateChanged(auth, async (user) => {
     const loader = document.getElementById('global-loader');
     let isAdmin = false;
     
@@ -911,14 +786,12 @@ supabase.auth.onAuthStateChange(async (event, session) => {
         authLoadingTimeout = null;
     }
     
-    const user = session?.user;
-    
     if (user) {
-        Logger.info('Utilisateur connecté', { email: user.email, uid: user.id });
+        Logger.info('Utilisateur connecté', { email: user.email, uid: user.uid });
         
         try {
             // Vérifier l'instance unique
-            const canContinue = await startSessionMonitoring(user.id);
+            const canContinue = await startSessionMonitoring(user.uid);
             if (!canContinue) {
                 Logger.warn('Instance unique bloquée');
                 return;
@@ -974,25 +847,24 @@ supabase.auth.onAuthStateChange(async (event, session) => {
 
             // 1. Charger la collection
             Logger.debug('Chargement collection utilisateur');
-            await fetchUserCollection(user.id);
+            await fetchUserCollection(user.uid);
             
             // 2. Vérifier si un booster est en cours d'ouverture
-            const snap = await getPlayerDoc(user.id);
-            const playerData = snap.data();
-            if (snap.exists() && playerData.current_booster && playerData.current_booster.length > 0) {
+            const snap = await getDoc(doc(db, "players", user.uid));
+            if (snap.exists() && snap.data().currentBooster && snap.data().currentBooster.length > 0) {
                 // Restaurer l'ouverture en cours
                 Logger.info('Restauration booster en cours');
-                tempBoosterCards = playerData.current_booster;
-                const revealedCards = playerData.booster_revealed_cards || [];
+                tempBoosterCards = snap.data().currentBooster;
+                const revealedCards = snap.data().boosterRevealedCards || [];
                 openBoosterVisual(revealedCards);
             }
             
             // Vérifier les notifications admin
-            if (snap.exists() && playerData.admin_notification) {
-                const notif = playerData.admin_notification;
+            if (snap.exists() && snap.data().adminNotification) {
+                const notif = snap.data().adminNotification;
                 window.showPopup("Notification Admin", notif.message);
                 // Supprimer la notification après affichage (utiliser safe write)
-                await safeSetPlayerDoc(user.id, { admin_notification: null }, { merge: true });
+                await safeSetPlayerDoc(user.uid, { adminNotification: null }, { merge: true });
             }
             
             // 3. Charger le classeur (Gen par défaut)
@@ -1002,7 +874,7 @@ supabase.auth.onAuthStateChange(async (event, session) => {
             await changeGen(); 
 
             // 4. Vérifier le Cooldown
-            if (!isAdmin) await checkCooldown(user.id);
+            if (!isAdmin) await checkCooldown(user.uid);
             else enableBoosterButton(true);
 
             // Fin du chargement
@@ -1040,18 +912,17 @@ supabase.auth.onAuthStateChange(async (event, session) => {
     }
 });
 
-// Récupérer la collection depuis Supabase
+// Récupérer la collection depuis Firebase
 async function fetchUserCollection(uid) {
     try {
-        const snap = await getPlayerDoc(uid);
-        const playerData = snap.data();
+        const snap = await getDoc(doc(db, "players", uid));
         if (snap.exists()) {
-            userCollection = playerData.collection || [];
+            userCollection = snap.data().collection || [];
             const countEl = document.getElementById('card-count');
             if(countEl) countEl.innerText = userCollection.length;
             // Apply role class to the profile pill for per-role icon filters
             try {
-                const role = playerData.role || 'player';
+                const role = snap.data().role || 'player';
                 const userProfilePill = document.getElementById('user-profile-pill');
                 if (userProfilePill) {
                     userProfilePill.classList.remove('role-player','role-admin','role-vip');
@@ -1062,18 +933,17 @@ async function fetchUserCollection(uid) {
             // Mettre à jour l'affichage des points
             updatePointsDisplay();
         } else {
-            // Le compte n'existe pas -> Recréer automatiquement
+            // Le compte n'existe pas en Firestore -> Recréer automatiquement
             console.log("Document joueur inexistant, création...");
-            const { data } = await supabase.auth.getUser();
             await safeSetPlayerDoc(uid, {
-                email: data.user.email,
+                email: auth.currentUser.email,
                 collection: [],
-                packs_by_gen: {},
-                last_draw_time: 0,
-                available_packs: PACKS_PER_COOLDOWN,
+                packsByGen: {},
+                lastDrawTime: 0,
+                availablePacks: PACKS_PER_COOLDOWN,
                 role: 'player',
                 points: 0,
-                bonus_packs: 0
+                bonusPacks: 0
             }, { merge: true });
             userCollection = [];
             const countEl = document.getElementById('card-count');
@@ -1091,16 +961,16 @@ async function fetchUserCollection(uid) {
     } catch (e) {
         console.error("Erreur chargement collection:", e);
         window.showPopup("Erreur", "Impossible de charger votre profil. Veuillez vous reconnecter.");
-        await supabase.auth.signOut();
+        await signOut(auth);
     }
 }
 
 // Fonction pour afficher les points et bonus packs
 async function updatePointsDisplay() {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth.currentUser;
     if (!user) return;
     
-    const snap = await getPlayerDoc(user.id);
+    const snap = await getDoc(doc(db, "players", user.uid));
     if (!snap.exists()) return;
     
     const data = snap.data();
@@ -1108,10 +978,10 @@ async function updatePointsDisplay() {
     const currentGen = genSelect ? genSelect.value : 'gen7';
     
     // Récupérer les données de la génération active
-    const packs_by_gen = data.packs_by_gen || {};
-    const genData = packs_by_gen[currentGen] || { points: 0, bonus_packs: 0 };
+    const packsByGen = data.packsByGen || {};
+    const genData = packsByGen[currentGen] || { points: 0, bonusPacks: 0 };
     const points = genData.points || 0;
-    const bonus_packs = genData.bonus_packs || 0;
+    const bonusPacks = genData.bonusPacks || 0;
     // Seuil de points pour cet utilisateur (VIP = 20)
     const pointsForThisUser = (data.role === 'vip') ? 20 : POINTS_FOR_BONUS_PACK;
     // Mettre à jour la valeur des points
@@ -1134,17 +1004,17 @@ async function updatePointsDisplay() {
     const bonusBtnContent = document.querySelector('#bonus-packs-info .bonus-btn-content');
     
     if (bonusInfoEl && bonusCountEl) {
-        if (bonus_packs > 0) {
+        if (bonusPacks > 0) {
             bonusInfoEl.style.display = 'block';
-            bonusCountEl.textContent = bonus_packs;
+            bonusCountEl.textContent = bonusPacks;
 
             // Formuler correctement au singulier / pluriel pour le bouton
             // Exemples : "Utiliser votre booster bonus (1 disponible)" ou "Utiliser vos boosters bonus (2 disponibles)"
             if (bonusBtnContent) {
-                const pronoun = bonus_packs === 1 ? 'votre' : 'vos';
-                const noun = bonus_packs === 1 ? 'booster bonus' : 'boosters bonus';
-                const dispo = bonus_packs === 1 ? 'disponible' : 'disponibles';
-                const label = `${pronoun} ${noun} (${bonus_packs} ${dispo})`;
+                const pronoun = bonusPacks === 1 ? 'votre' : 'vos';
+                const noun = bonusPacks === 1 ? 'booster bonus' : 'boosters bonus';
+                const dispo = bonusPacks === 1 ? 'disponible' : 'disponibles';
+                const label = `${pronoun} ${noun} (${bonusPacks} ${dispo})`;
                 // Rebuild content keeping the icon and same classes
                 bonusBtnContent.innerHTML = `
                     <img src="assets/icons/gift.svg" class="title-icon" alt="gift">
@@ -1153,7 +1023,7 @@ async function updatePointsDisplay() {
             }
 
             if (bonusPluralEl) {
-                bonusPluralEl.textContent = bonus_packs > 1 ? 's' : '';
+                bonusPluralEl.textContent = bonusPacks > 1 ? 's' : '';
             }
         } else {
             bonusInfoEl.style.display = 'none';
@@ -1163,10 +1033,10 @@ async function updatePointsDisplay() {
 
 // Fonction pour utiliser un bonus pack
 window.useBonusPack = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth.currentUser;
     if (!user) return;
     
-    const snap = await getPlayerDoc(user.id);
+    const snap = await getDoc(doc(db, "players", user.uid));
     if (!snap.exists()) return;
     
     const data = snap.data();
@@ -1174,41 +1044,41 @@ window.useBonusPack = async () => {
     const currentGen = genSelect ? genSelect.value : 'gen7';
     
     // Récupérer les données de la génération active
-    const packs_by_gen = data.packs_by_gen || {};
-    const genData = packs_by_gen[currentGen] || { points: 0, bonus_packs: 0 };
-    const bonus_packs = genData.bonus_packs || 0;
+    const packsByGen = data.packsByGen || {};
+    const genData = packsByGen[currentGen] || { points: 0, bonusPacks: 0 };
+    const bonusPacks = genData.bonusPacks || 0;
     
-    if (bonus_packs <= 0) {
+    if (bonusPacks <= 0) {
         window.showPopup("Pas de bonus", "Vous n'avez pas de booster bonus disponible pour cette génération.");
         return;
     }
     // Ouvrir autant de boosters que de boosters bonus accumulés
     // drawCard gère la consommation des bonus quand on passe { isBonus: true }
-    await drawCard(bonus_packs, { isBonus: true });
+    await drawCard(bonusPacks, { isBonus: true });
 }
 
 // Fonction pour ouvrir la boutique
 window.openShop = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth.currentUser;
     if (!user) return;
     
-    const snap = await getPlayerDoc(user.id);
+    const snap = await getDoc(doc(db, "players", user.uid));
     if (!snap.exists()) return;
     
     const data = snap.data();
     const genSelect = document.getElementById('gen-select');
     const currentGen = genSelect ? genSelect.value : 'gen7';
-    const packs_by_gen = data.packs_by_gen || {};
-    const genData = packs_by_gen[currentGen] || { points: 0, bonus_packs: 0 };
+    const packsByGen = data.packsByGen || {};
+    const genData = packsByGen[currentGen] || { points: 0, bonusPacks: 0 };
     const points = genData.points || 0;
-    const bonus_packs = genData.bonus_packs || 0;
+    const bonusPacks = genData.bonusPacks || 0;
     
     const shopHtml = `
         <div style="text-align: center;">
             <div style="font-size: 3rem; margin: 20px 0;"><img src="assets/icons/gift.svg" class="icon-inline" alt="gift"></div>
                 <div style="font-size: 1.2rem; margin-bottom: 20px;">
                 <strong>Vos points :</strong> ${points}/${pointsForThisUser}<br>
-                <strong>Boosters bonus disponibles :</strong> ${bonus_packs}
+                <strong>Boosters bonus disponibles :</strong> ${bonusPacks}
             </div>
             <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; margin: 20px 0;">
                 <p style="margin: 10px 0;"><img src="assets/icons/gem.svg" class="icon-inline" alt="points"> Chaque carte obtenue vous donne <strong>${POINTS_PER_CARD} point</strong></p>
@@ -1222,9 +1092,9 @@ window.openShop = async () => {
                 </div>
                 <p style="color: #ccc; font-size: 0.9rem;">${points} / ${pointsForThisUser} points</p>
             </div>
-            ${bonus_packs > 0 ? `
+            ${bonusPacks > 0 ? `
                 <button onclick="closePopup(); useBonusPack();" class="btn-primary" style="width: 100%; padding: 15px; margin-top: 20px; font-size: 1.1rem;">
-                    <img src="assets/icons/gift.svg" class="icon-inline" alt="gift"> Utiliser un booster bonus (${bonus_packs} disponible${bonus_packs > 1 ? 's' : ''})
+                    <img src="assets/icons/gift.svg" class="icon-inline" alt="gift"> Utiliser un booster bonus (${bonusPacks} disponible${bonusPacks > 1 ? 's' : ''})
                 </button>
             ` : `
                 <p style="color: #999; margin-top: 20px;">Collectionnez plus de cartes pour gagner des boosters bonus !</p>
@@ -1256,9 +1126,9 @@ window.changeGen = async () => {
     currentGenData = []; // Reset des données locales
     
     // Vérifier le cooldown de cette génération
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth.currentUser;
     if (user && user.email !== ADMIN_EMAIL) {
-        await checkCooldown(user.id);
+        await checkCooldown(user.uid);
     }
     
     // Mettre à jour la disponibilité du bouton selon la quantité sélectionnée
@@ -1610,11 +1480,11 @@ function createCardElement(card, quantity = 1, cardNumber = null, totalCards = n
 
 // --- OUVERTURE DE BOOSTER ---
 window.drawCard = async (overridePackQuantity = null, options = {}) => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth.currentUser;
     if (!user) return;
     const isAdmin = (user.email === ADMIN_EMAIL);
     // Récupérer le rôle/utilisateur (utile pour VIP)
-    const userSnapForDraw = await getPlayerDoc(user.id);
+    const userSnapForDraw = await getDoc(doc(db, "players", user.uid));
     const userRoleForDraw = userSnapForDraw && userSnapForDraw.exists() ? userSnapForDraw.data().role : null;
     const isVip = userRoleForDraw === 'vip';
     const btn = document.getElementById('btn-draw');
@@ -1637,14 +1507,14 @@ window.drawCard = async (overridePackQuantity = null, options = {}) => {
     // Vérifier si l'utilisateur a assez de packs disponibles (sauf en bonus-mode)
     const isBonus = !!options.isBonus;
     if (!isAdmin && !isBonus) {
-        const snap = await getPlayerDoc(user.id);
+        const snap = await getDoc(doc(db, "players", user.uid));
         if (snap.exists()) {
-            const packs_by_gen = snap.data().packs_by_gen || {};
-            const genData = packs_by_gen[selectedGen] || { available_packs: PACKS_PER_COOLDOWN };
-            const available_packs = genData.available_packs ?? PACKS_PER_COOLDOWN;
+            const packsByGen = snap.data().packsByGen || {};
+            const genData = packsByGen[selectedGen] || { availablePacks: PACKS_PER_COOLDOWN };
+            const availablePacks = genData.availablePacks ?? PACKS_PER_COOLDOWN;
             
-            if (available_packs < packQuantity) {
-                window.showPopup("Pas assez de packs", `Vous voulez ouvrir ${packQuantity} pack(s) mais vous n'en avez que ${available_packs} disponible(s) pour cette génération.`);
+            if (availablePacks < packQuantity) {
+                window.showPopup("Pas assez de packs", `Vous voulez ouvrir ${packQuantity} pack(s) mais vous n'en avez que ${availablePacks} disponible(s) pour cette génération.`);
                 return;
             }
         }
@@ -1722,22 +1592,22 @@ window.drawCard = async (overridePackQuantity = null, options = {}) => {
 
         // Sauvegarde Firebase
         const updateData = { 
-            current_booster: tempBoosterCards, // Sauvegarde de l'ouverture en cours
-            booster_revealed_cards: [] // Aucune carte révélée au départ
+            currentBooster: tempBoosterCards, // Sauvegarde de l'ouverture en cours
+            boosterRevealedCards: [] // Aucune carte révélée au départ
         };
         
         // Récupérer les données actuelles une seule fois
-        const currentSnap = await getPlayerDoc(user.id);
+        const currentSnap = await getDoc(doc(db, "players", user.uid));
         const currentData = currentSnap.exists() ? currentSnap.data() : {};
-        const packs_by_gen = currentData.packs_by_gen || {};
-        const genData = packs_by_gen[selectedGen] || { available_packs: PACKS_PER_COOLDOWN, last_draw_time: 0, points: 0, bonus_packs: 0 };
+        const packsByGen = currentData.packsByGen || {};
+        const genData = packsByGen[selectedGen] || { availablePacks: PACKS_PER_COOLDOWN, lastDrawTime: 0, points: 0, bonusPacks: 0 };
         
         // Si ce n'est pas un bonus, on décrémente les packs disponibles (sauf admin)
         if (!isAdmin && !isBonus) {
-            let available_packs = genData.available_packs ?? PACKS_PER_COOLDOWN;
-            available_packs = Math.max(0, available_packs - packQuantity);
-            genData.available_packs = available_packs;
-            genData.last_draw_time = Date.now();
+            let availablePacks = genData.availablePacks ?? PACKS_PER_COOLDOWN;
+            availablePacks = Math.max(0, availablePacks - packQuantity);
+            genData.availablePacks = availablePacks;
+            genData.lastDrawTime = Date.now();
         }
         
         // Calculer les points gagnés
@@ -1745,7 +1615,7 @@ window.drawCard = async (overridePackQuantity = null, options = {}) => {
         const pointsGained = cardsCount * POINTS_PER_CARD;
         
         const currentPoints = genData.points || 0;
-        const currentBonusPacks = genData.bonus_packs || 0;
+        const currentBonusPacks = genData.bonusPacks || 0;
         
         // Si on utilise des boosters bonus, soustraire la quantité utilisée avant de calculer les gains
         let startingBonusPacks = currentBonusPacks;
@@ -1759,17 +1629,17 @@ window.drawCard = async (overridePackQuantity = null, options = {}) => {
         const earnedBonusPacks = Math.floor(totalPoints / pointsForThisUser);
         const remainingPoints = totalPoints % pointsForThisUser;
         
-        // Mettre à jour les données de cette génération (conserve available_packs et last_draw_time)
-        packs_by_gen[selectedGen] = {
+        // Mettre à jour les données de cette génération (conserve availablePacks et lastDrawTime)
+        packsByGen[selectedGen] = {
             ...genData,
             points: remainingPoints,
-            bonus_packs: startingBonusPacks + earnedBonusPacks
+            bonusPacks: startingBonusPacks + earnedBonusPacks
         };
         
-        updateData.packs_by_gen = packs_by_gen;
+        updateData.packsByGen = packsByGen;
         
         // Utiliser safeSetPlayerDoc pour gérer les erreurs de quota et mettre en file si nécessaire
-        await safeSetPlayerDoc(user.id, updateData, { merge: true });
+        await safeSetPlayerDoc(user.uid, updateData, { merge: true });
 
         // Ajout à la collection locale
         userCollection.push(...tempBoosterCards);
@@ -1781,21 +1651,23 @@ window.drawCard = async (overridePackQuantity = null, options = {}) => {
         // Mettre à jour l'affichage du nombre de packs disponibles
         await updatePackQuantity();
         
-        // Stocker le nombre de boosters bonus gagnés pour l'afficher après la fermeture
-        window._earnedBonusPacksThisOpen = earnedBonusPacks;
+        // Afficher un message si un booster bonus a été gagné
+        if (earnedBonusPacks > 0) {
+            window.showPopup("<img src='assets/icons/gift.svg' class='icon-inline' alt='gift'> Booster Bonus!", `Vous avez gagné ${earnedBonusPacks} booster(s) bonus avec vos points !`);
+        }
 
         // Gestion Timer
         if (!isAdmin) {
             // Si plus de packs disponibles pour cette génération, démarrer le timer
-            const snap = await getPlayerDoc(user.id);
+            const snap = await getDoc(doc(db, "players", user.uid));
             if (snap.exists()) {
-                const packs_by_gen = snap.data().packs_by_gen || {};
-                const genData = packs_by_gen[selectedGen] || { available_packs: 0 };
-                const available_packs = genData.available_packs ?? 0;
+                const packsByGen = snap.data().packsByGen || {};
+                const genData = packsByGen[selectedGen] || { availablePacks: 0 };
+                const availablePacks = genData.availablePacks ?? 0;
                 
-                if (available_packs === 0) {
+                if (availablePacks === 0) {
                     const cooldownMins = isVip ? VIP_COOLDOWN_MINUTES : COOLDOWN_MINUTES;
-                    startTimer(cooldownMins * 60 * 1000, user.id);
+                    startTimer(cooldownMins * 60 * 1000, user.uid);
                 }
             }
         } else { 
@@ -1915,10 +1787,10 @@ function openBoosterVisual(alreadyRevealed = []) {
                 
                 // Sauvegarder la carte révélée en buffer et planifier un flush (debounced)
                 alreadyRevealed.push(index);
-                const { data: { user } } = await supabase.auth.getUser();
+                const user = auth.currentUser;
                 if (user) {
                     _pendingRevealed = _pendingRevealed ? _pendingRevealed.concat(index) : [index];
-                    _scheduleSaveRevealed(user.id);
+                    _scheduleSaveRevealed(user.uid);
                 }
                 
                 // Si tout est révélé, on montre le bouton OK
@@ -1963,7 +1835,7 @@ window.revealAllCards = async () => {
     const flipCards = document.querySelectorAll('.flip-card:not(.flipped)');
     const revealBtn = document.getElementById('reveal-all-btn');
     if (revealBtn) revealBtn.style.display = 'none';
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth.currentUser;
     
     flipCards.forEach((card, index) => {
         setTimeout(() => {
@@ -1978,7 +1850,7 @@ window.revealAllCards = async () => {
             // push into pending buffer and flush quickly
             _pendingRevealed = allIndices;
             // force immediate flush
-            await _flushPendingRevealed(user.id);
+            await _flushPendingRevealed(user.uid);
         } catch (e) {
             console.error("Erreur sauvegarde révélation complète:", e);
         }
@@ -2006,11 +1878,11 @@ window.closeBooster = async () => {
     await new Promise(resolve => setTimeout(resolve, BOOSTER_DELAY_SECONDS * 1000));
     
     // Nettoyer les données de booster en cours dans Firestore
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth.currentUser;
     if (user) {
         try {
             // Ensure any pending revealed indices are flushed before clearing
-            await _flushPendingRevealed(user.id);
+            await _flushPendingRevealed(user.uid);
 
             // Ajouter les cartes ouvertes à la collection en une seule écriture
             // (réduit les écritures fréquentes qui causaient des erreurs de quota)
@@ -2018,13 +1890,13 @@ window.closeBooster = async () => {
                 if (Array.isArray(tempBoosterCards) && tempBoosterCards.length > 0) {
                     try {
                         // Try immediate write first
-                        await arrayUnionUpdate(user.id, 'collection', tempBoosterCards);
+                        await setDoc(doc(db, 'players', user.uid), { collection: arrayUnion(...tempBoosterCards) }, { merge: true });
                     } catch (e) {
                         const isQuota = (e && e.code && e.code === 'resource-exhausted') || (e && typeof e.message === 'string' && e.message.toLowerCase().includes('quota'));
                         if (isQuota) {
                             // Fallback: enqueue a merged add-to-collection operation
-                            console.warn('Quota lors de l\'ajout à la collection — mise en file (addToCollection)', { uid: user.id, count: tempBoosterCards.length });
-                            _enqueueCollectionAdd(user.id, tempBoosterCards);
+                            console.warn('Quota lors de l\'ajout à la collection — mise en file (addToCollection)', { uid: user.uid, count: tempBoosterCards.length });
+                            _enqueueCollectionAdd(user.uid, tempBoosterCards);
                         } else {
                             console.error("Erreur ajout collection à la fermeture du booster:", e);
                         }
@@ -2035,9 +1907,9 @@ window.closeBooster = async () => {
             }
 
             // Nettoyer l'état du booster en cours dans Firestore
-            await safeSetPlayerDoc(user.id, {
-                current_booster: [],
-                booster_revealed_cards: []
+            await safeSetPlayerDoc(user.uid, {
+                currentBooster: [],
+                boosterRevealedCards: []
             }, { merge: true });
         } catch (e) {
             console.error("Erreur nettoyage booster:", e);
@@ -2052,7 +1924,7 @@ window.closeBooster = async () => {
             btn.innerHTML = '<div class="booster-content">OUVRIR UN BOOSTER</div>';
         } else {
             // Vérifier les packs disponibles pour les joueurs normaux
-            await checkCooldown(user.id);
+            await checkCooldown(user.uid);
         }
     }
     
@@ -2067,30 +1939,18 @@ window.closeBooster = async () => {
 
     // Recharger le binder pour montrer les nouvelles cartes
     renderBinder();
-    
-    // Afficher le popup de bonus packs si des packs ont été gagnés durant cette ouverture
-    if (window._earnedBonusPacksThisOpen && window._earnedBonusPacksThisOpen > 0) {
-        const earnedCount = window._earnedBonusPacksThisOpen;
-        window._earnedBonusPacksThisOpen = 0; // Reset pour la prochaine fois
-        
-        const bonusText = earnedCount === 1 ? 'booster bonus' : 'boosters bonus';
-        window.showPopup(
-            "🎁 Booster Bonus!",
-            `Félicitations ! Vous avez gagné ${earnedCount} ${bonusText} avec vos points !`
-        );
-    }
 };
 
 // --- COOLDOWN PAR GÉNÉRATION ---
 // Helper pour régénérer les packs d'une génération
-async function regeneratePacksForGen(uid, currentGen, packs_by_gen) {
-    packs_by_gen[currentGen] = {
-        available_packs: PACKS_PER_COOLDOWN,
-        last_draw_time: 0
+async function regeneratePacksForGen(uid, currentGen, packsByGen) {
+    packsByGen[currentGen] = {
+        availablePacks: PACKS_PER_COOLDOWN,
+        lastDrawTime: 0
     };
     
     await safeSetPlayerDoc(uid, { 
-        packs_by_gen: packs_by_gen
+        packsByGen: packsByGen
     }, { merge: true });
     
     return PACKS_PER_COOLDOWN;
@@ -2100,26 +1960,26 @@ async function checkCooldown(uid) {
     const genSelect = document.getElementById('gen-select');
     const currentGen = genSelect ? genSelect.value : 'gen7';
     
-    const snap = await getPlayerDoc(uid);
+    const snap = await getDoc(doc(db, "players", uid));
     if (snap.exists()) {
         const data = snap.data();
-        const packs_by_gen = data.packs_by_gen || {};
-        const genData = packs_by_gen[currentGen] || { available_packs: PACKS_PER_COOLDOWN, last_draw_time: 0 };
+        const packsByGen = data.packsByGen || {};
+        const genData = packsByGen[currentGen] || { availablePacks: PACKS_PER_COOLDOWN, lastDrawTime: 0 };
         
-        let available_packs = genData.available_packs ?? PACKS_PER_COOLDOWN;
-        const lastDraw = genData.last_draw_time || 0;
+        let availablePacks = genData.availablePacks ?? PACKS_PER_COOLDOWN;
+        const lastDraw = genData.lastDrawTime || 0;
         
         const diff = Date.now() - lastDraw;
         const cooldownMinutesForUser = (data.role === 'vip') ? VIP_COOLDOWN_MINUTES : COOLDOWN_MINUTES;
         const cooldownMs = cooldownMinutesForUser * 60 * 1000;
         
         // Si le cooldown est passé ET qu'il n'y a plus de packs, régénérer TOUS les packs
-        const wasZero = available_packs <= 0;
+        const wasZero = availablePacks <= 0;
         if (wasZero && diff >= cooldownMs) {
-            available_packs = await regeneratePacksForGen(uid, currentGen, packs_by_gen);
+            availablePacks = await regeneratePacksForGen(uid, currentGen, packsByGen);
         }
         
-        if (available_packs > 0) {
+        if (availablePacks > 0) {
             enableBoosterButton(true);
             // Vérifier si on peut ouvrir le nombre de packs sélectionné
             await updatePackQuantity();
@@ -2132,9 +1992,9 @@ async function checkCooldown(uid) {
             } else {
                 // Si le temps est déjà passé mais qu'on arrive ici, forcer la régénération
                 // (Ne devrait normalement pas arriver grâce au check ci-dessus)
-                available_packs = await regeneratePacksForGen(uid, currentGen, packs_by_gen);
+                availablePacks = await regeneratePacksForGen(uid, currentGen, packsByGen);
                 await updatePackQuantity();
-                updatePacksDisplay(available_packs, true);
+                updatePacksDisplay(availablePacks, true);
                 enableBoosterButton(true);
             }
         }
@@ -2260,10 +2120,10 @@ window.requestNotification = async () => {
             Logger.info('Permission de notification accordée');
             
             // Save notification preference to user profile
-            const { data: { user } } = await supabase.auth.getUser();
+            const user = auth.currentUser;
             if (user) {
                 try {
-                    await safeSetPlayerDoc(user.id, { notifications_enabled: true }, { merge: true });
+                    await safeSetPlayerDoc(user.uid, { notificationsEnabled: true }, { merge: true });
                 } catch (error) {
                     Logger.error('Erreur lors de la sauvegarde de la préférence de notification', error);
                 }
@@ -2309,20 +2169,19 @@ function updateBellIcon() {
 
 // Basculer la préférence de notifications utilisateur (BDD)
 window.toggleNotifications = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth.currentUser;
     if (!user) {
         window.showPopup('Erreur', "Connectez-vous pour gérer les notifications.");
         return;
     }
 
     try {
-        const snap = await getPlayerDoc(user.id);
-        const playerData = snap.data();
-        const current = snap.exists() ? (playerData.notifications_enabled || false) : false;
+        const snap = await getDoc(doc(db, 'players', user.uid));
+        const current = snap.exists() ? (snap.data().notificationsEnabled || false) : false;
 
         if (current) {
             // Désactiver
-            await safeSetPlayerDoc(user.id, { notifications_enabled: false }, { merge: true });
+            await safeSetPlayerDoc(user.uid, { notificationsEnabled: false }, { merge: true });
             updateBellIcon();
             window.showPopup('Notifications', 'Notifications désactivées.');
         } else {
@@ -2339,27 +2198,59 @@ window.toggleNotifications = async () => {
 window.googleLogin = async () => {
     const authMsg = document.getElementById('auth-msg');
     
+    // Sur iOS (iPhone/iPod/old iPads) ou modern iPad ou Safari, utiliser redirect car popups souvent bloquées
+    // Note: isIOS catches old iPads, isIPad catches modern iPads reporting as MacIntel
+    const shouldUseRedirect = DeviceInfo.isIOS || DeviceInfo.isIPad || DeviceInfo.isSafari;
+    
     try {
         authMsg.innerText = 'Connexion en cours...';
         authMsg.style.color = '#4CAF50';
         
-        Logger.info('Connexion Google avec Supabase');
-        const { data, error } = await supabase.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-                redirectTo: window.location.origin + window.location.pathname
-            }
-        });
+        if (shouldUseRedirect) {
+            Logger.info('Utilisation de redirect pour iOS/iPad/Safari');
+            await signInWithRedirect(auth, provider);
+            // La page va se recharger, pas besoin de faire quoi que ce soit d'autre
+            return;
+        }
         
-        if (error) throw error;
-        
-        Logger.info('Connexion Google réussie');
+        Logger.info('Tentative de connexion Google via popup');
+        await signInWithPopup(auth, provider);
+        Logger.info('Connexion Google via popup réussie');
         authMsg.innerText = '';
         
     } catch(e) {
-        Logger.error('Erreur de connexion Google', { message: e.message });
-        authMsg.style.color = '#ff6b6b';
-        authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Erreur: ' + e.message;
+        Logger.warn('Erreur popup Google, tentative de redirection', { 
+            code: e.code, 
+            message: e.message 
+        });
+        
+        // Si popup bloquée ou fermée, utiliser redirect
+        if (e.code === 'auth/popup-blocked' || 
+            e.code === 'auth/popup-closed-by-user' || 
+            e.code === 'auth/cancelled-popup-request') {
+            
+            Logger.info('Utilisation de la méthode de redirection');
+            authMsg.innerText = 'Redirection vers Google...';
+            authMsg.style.color = '#4CAF50';
+            
+            try {
+                await signInWithRedirect(auth, provider);
+            } catch(redirectError) {
+                Logger.error('Erreur lors de la redirection Google', redirectError);
+                authMsg.style.color = '#ff6b6b';
+                authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Erreur de connexion: ' + redirectError.message;
+            }
+        } else {
+            // Autre type d'erreur
+            Logger.error('Erreur de connexion Google', { code: e.code, message: e.message });
+            authMsg.style.color = '#ff6b6b';
+            
+            if (e.code === 'auth/account-exists-with-different-credential') {
+                authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Ce compte existe déjà avec une autre méthode';
+            } else if (e.code === 'auth/network-request-failed') {
+                authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Erreur réseau. Vérifiez votre connexion.';
+            } else {
+                authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Erreur: ' + e.message;
             }
         }
     }
@@ -2383,38 +2274,15 @@ window.signUp = async () => {
     authMsg.style.color = '#4CAF50';
     
     try {
-        const { data, error } = await supabase.auth.signUp({
-            email: email,
-            password: password,
-            options: {
-                emailRedirectTo: window.location.origin + window.location.pathname
-            }
-        });
-        
-        if (error) throw error;
-        
-        // Create player record
-        if (data.user) {
-            await setPlayerDoc(data.user.id, {
-                email: email,
-                collection: [],
-                packs_by_gen: {},
-                last_draw_time: 0,
-                available_packs: PACKS_PER_COOLDOWN,
-                role: 'player',
-                points: 0,
-                bonus_packs: 0
-            });
-        }
-        
+        await authUser(createUserWithEmailAndPassword(auth, email, password));
         authMsg.innerText = '';
     } catch(e) {
         authMsg.style.color = '#ff6b6b';
-        if (e.message.includes('already registered')) {
+        if (e.code === 'auth/email-already-in-use') {
             authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Cette adresse email est déjà utilisée';
-        } else if (e.message.includes('invalid')) {
+        } else if (e.code === 'auth/invalid-email') {
             authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Adresse email invalide';
-        } else if (e.message.includes('password')) {
+        } else if (e.code === 'auth/weak-password') {
             authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Mot de passe trop faible';
         } else {
             authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Erreur : ' + e.message;
@@ -2436,25 +2304,24 @@ window.signIn = async () => {
     authMsg.style.color = '#4CAF50';
     
     try {
-        const { error } = await supabase.auth.signInWithPassword({
-            email: email,
-            password: password
-        });
-        
-        if (error) throw error;
+        await signInWithEmailAndPassword(auth, email, password);
         authMsg.innerText = '';
     } catch(e) {
         authMsg.style.color = '#ff6b6b';
-        if (e.message.includes('Invalid login credentials')) {
+        if (e.code === 'auth/user-not-found') {
+            authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Aucun compte trouvé avec cet email';
+        } else if (e.code === 'auth/wrong-password') {
+            authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Mot de passe incorrect';
+        } else if (e.code === 'auth/invalid-email') {
+            authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Adresse email invalide';
+        } else if (e.code === 'auth/invalid-credential') {
             authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Email ou mot de passe incorrect';
-        } else if (e.message.includes('Email not confirmed')) {
-            authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Veuillez confirmer votre email';
         } else {
             authMsg.innerHTML = '<img src="assets/icons/triangle-alert.svg" class="icon-inline" alt="warn"> Erreur : ' + e.message;
         }
     }
 };
-window.logout = () => supabase.auth.signOut();
+window.logout = () => signOut(auth);
 
 // Toggle password visibility (button is non-tabbable via tabindex="-1")
 window.togglePasswordVisibility = (btn) => {
@@ -2474,3 +2341,25 @@ window.togglePasswordVisibility = (btn) => {
         // silent
     }
 };
+
+async function authUser(promise) {
+    try {
+        const res = await promise;
+        const ref = doc(db, "players", res.user.uid);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) {
+            await safeSetPlayerDoc(res.user.uid, {
+                email: res.user.email,
+                collection: [],
+                packsByGen: {},
+                lastDrawTime: 0,
+                availablePacks: PACKS_PER_COOLDOWN,
+                points: 0,
+                bonusPacks: 0
+            }, { merge: true });
+        }
+    } catch (e) {
+        console.error('Auth error:', e);
+        throw e; // Propager l'erreur pour qu'elle soit gérée par signUp
+    }
+}
