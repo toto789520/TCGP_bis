@@ -24,9 +24,33 @@ html, body {
     hyphens: auto;
 }
 
-/* Button inner content helper to keep icon + text on one line */
+/* Button inner content helper: allow icon + text to wrap onto multiple lines */
 .bonus-btn-content {
-    display: inline-flex; align-items: center; gap: 10px; white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.bonus-btn-content span {
+    white-space: normal;
+}
+
+/* Ensure the icon doesn't stay left-aligned when the text wraps: on narrow containers,
+   make the icon occupy its own row and center it without affecting the text lines. */
+.bonus-btn-content img.title-icon {
+    flex: 0 0 auto;
+    height: 35px;
+    filter: brightness(0) saturate(100%) invert(0%) sepia(2%) saturate(23%) hue-rotate(336deg) brightness(106%) contrast(100%);
+}
+@media (max-width: 520px) {
+    .bonus-btn-content img.title-icon {
+        margin-left: auto;
+        margin-right: auto;
+        display: block;
+    }
+    .bonus-btn-content span {
+        flex-basis: 100%;
+    }
 }
 
 /* --- LOADERS & OVERLAYS --- */
@@ -1132,15 +1156,20 @@ td:nth-child(5) > div { display: flex; gap: 5px; flex-wrap: wrap; align-items: c
 }
 
 @media (max-width: 1024px) {
-    .admin-container { padding: 15px; margin: 20px auto; }
-    .admin-title { font-size: 1.5rem; }
-    table { font-size: 0.85rem; }
-    th, td { padding: 10px 12px; }
-    .btn-action { padding: 6px 10px; font-size: 0.75rem; }
-}
-
-@media (max-width: 768px) {
-    .admin-container { padding: 10px; margin: 10px auto; }
+    .bonus-btn-content {
+        width: 100%;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+    }
+    .bonus-btn-content img.title-icon {
+        flex-basis: 100%;
+        margin: 0 auto 0 auto;
+        display: block;
+    }
+    .bonus-btn-content span {
+        flex-basis: 100%;
+    }
     .admin-header { flex-direction: column; align-items: flex-start; }
     .admin-title { font-size: 1.3rem; }
     .btn-back { width: 100%; text-align: center; }

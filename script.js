@@ -56,6 +56,175 @@ const Logger = {
     }
 };
 
+// --- FIRESTORE WRITE BUFFER FOR BOOSTER REVEALS ---
+// Reduce write frequency by buffering revealed indices and flushing with debounce
+let _pendingRevealed = null; // array of indices to save (shared for current open booster)
+let _saveBoosterTimer = null;
+const BOOSTER_SAVE_DEBOUNCE_MS = 5000; // flush after 5s of inactivity
+
+async function _flushPendingRevealed(uid) {
+    if (!uid || !_pendingRevealed || _pendingRevealed.length === 0) return;
+    const toSave = Array.from(new Set(_pendingRevealed)).sort((a,b)=>a-b);
+    _pendingRevealed = null;
+    clearTimeout(_saveBoosterTimer);
+    _saveBoosterTimer = null;
+    try {
+        await safeSetPlayerDoc(uid, { boosterRevealedCards: toSave }, { merge: true });
+    } catch (e) {
+        console.error('Erreur sauvegarde (batch) révélation:', e);
+    }
+}
+
+function _scheduleSaveRevealed(uid) {
+    if (!uid) return;
+    if (!_saveBoosterTimer) {
+        _saveBoosterTimer = setTimeout(() => _flushPendingRevealed(uid), BOOSTER_SAVE_DEBOUNCE_MS);
+    } else {
+        clearTimeout(_saveBoosterTimer);
+        _saveBoosterTimer = setTimeout(() => _flushPendingRevealed(uid), BOOSTER_SAVE_DEBOUNCE_MS);
+    }
+}
+
+// --- GENERIC PLAYER WRITE QUEUE (for resource-exhausted handling) ---
+const PLAYER_WRITE_QUEUE_KEY = 'player_write_queue_v1';
+let _playerWriteQueueTimer = null;
+const PLAYER_QUEUE_FLUSH_INTERVAL_MS = 30000; // try every 30s when items present
+
+function _readPlayerWriteQueue() {
+    try {
+        const raw = localStorage.getItem(PLAYER_WRITE_QUEUE_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+        console.error('Erreur lecture queue localStorage', e);
+        return [];
+    }
+}
+
+function _writePlayerWriteQueue(queue) {
+    try {
+        localStorage.setItem(PLAYER_WRITE_QUEUE_KEY, JSON.stringify(queue));
+    } catch (e) {
+        console.error('Erreur écriture queue localStorage', e);
+    }
+}
+
+function _enqueuePlayerWrite(uid, data, options = {}) {
+    const queue = _readPlayerWriteQueue();
+    queue.push({ uid, data, options, attempts: 0, createdAt: Date.now() });
+    _writePlayerWriteQueue(queue);
+    _schedulePlayerQueueFlush();
+}
+
+// Enqueue a collection-add operation that can be merged client-side to avoid
+// creating many separate writes for the same user. Items should be plain JS objects.
+function _enqueueCollectionAdd(uid, items = []) {
+    if (!Array.isArray(items) || items.length === 0) return;
+    const queue = _readPlayerWriteQueue();
+    // Try to find existing addToCollection for same uid and merge
+    let found = false;
+    for (let entry of queue) {
+        if (entry && entry.uid === uid && entry.op === 'addToCollection') {
+            entry.items = (entry.items || []).concat(items);
+            entry.createdAt = Math.min(entry.createdAt || Date.now(), Date.now());
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        queue.push({ uid, op: 'addToCollection', items: items.slice(), attempts: 0, createdAt: Date.now() });
+    }
+    _writePlayerWriteQueue(queue);
+    _schedulePlayerQueueFlush();
+}
+
+function _schedulePlayerQueueFlush(delay = PLAYER_QUEUE_FLUSH_INTERVAL_MS) {
+    if (_playerWriteQueueTimer) return; // already scheduled
+    _playerWriteQueueTimer = setTimeout(async () => {
+        _playerWriteQueueTimer = null;
+        await _processPlayerWriteQueue();
+    }, delay);
+}
+
+async function _processPlayerWriteQueue() {
+    let queue = _readPlayerWriteQueue();
+    if (!queue || queue.length === 0) return;
+    // Try to process items sequentially
+    let changed = false;
+    for (let i = 0; i < queue.length; ) {
+        const item = queue[i];
+        try {
+            if (item && item.op === 'addToCollection') {
+                // Convert queued addToCollection into an arrayUnion write
+                let items = item.items || [];
+                if (items.length > 0) {
+                    // Deduplicate by `id` when possible to avoid duplicate card writes
+                    try {
+                        const deduped = Array.from(new Map(items.map(c => [c && c.id ? c.id : JSON.stringify(c), c])).values());
+                        items = deduped;
+                    } catch (er) { /* fallback: use original items */ }
+                    await setDoc(doc(db, 'players', item.uid), { collection: arrayUnion(...items) }, { merge: true });
+                }
+            } else {
+                await setDoc(doc(db, 'players', item.uid), item.data, item.options || { merge: true });
+            }
+            // success -> remove this item
+            queue.splice(i, 1);
+            changed = true;
+            // continue without incrementing i
+        } catch (e) {
+            console.error('Erreur lors du flush de la queue joueur:', e);
+            item.attempts = (item.attempts || 0) + 1;
+            // If quota error, stop processing now and retry later with backoff
+            const isQuota = (e && e.code && e.code === 'resource-exhausted') || (e && typeof e.message === 'string' && e.message.toLowerCase().includes('quota'));
+            if (isQuota) {
+                // save modified queue and schedule retry with exponential backoff
+                _writePlayerWriteQueue(queue);
+                const backoff = Math.min(60000, 10000 * Math.pow(2, Math.min(6, item.attempts)));
+                _schedulePlayerQueueFlush(backoff);
+                return;
+            } else {
+                // Non-quota error: drop this item after many attempts
+                if (item.attempts > 3) {
+                    console.warn('Abandon write après plusieurs échecs:', item);
+                    queue.splice(i, 1);
+                    changed = true;
+                } else {
+                    // try next item
+                    i++;
+                }
+            }
+        }
+    }
+    if (changed) _writePlayerWriteQueue(queue);
+}
+
+async function safeSetPlayerDoc(uid, data, options = { merge: true }) {
+    try {
+        // Simple per-user rate limiter to avoid immediate write bursts from UI
+        if (!window._lastPlayerWriteAt) window._lastPlayerWriteAt = {};
+        const MIN_WRITE_INTERVAL_MS = 1000; // 1s per-user minimum
+        const last = window._lastPlayerWriteAt[uid] || 0;
+        const now = Date.now();
+        if (now - last < MIN_WRITE_INTERVAL_MS) {
+            // enqueue instead of immediate write to avoid bursts
+            _enqueuePlayerWrite(uid, data, options);
+            return;
+        }
+
+        await setDoc(doc(db, 'players', uid), data, options);
+        window._lastPlayerWriteAt[uid] = Date.now();
+    } catch (e) {
+        const isQuota = (e && e.code && e.code === 'resource-exhausted') || (e && typeof e.message === 'string' && e.message.toLowerCase().includes('quota'));
+        if (isQuota) {
+            console.warn('Quota Firestore dépassé — mise en file d\'attente de l\'écriture', { uid, data });
+            _enqueuePlayerWrite(uid, data, options);
+        } else {
+            // rethrow for other handlers
+            throw e;
+        }
+    }
+}
+
 // Charger les logs depuis localStorage au démarrage
 try {
     const savedLogs = localStorage.getItem('app_logs');
@@ -228,6 +397,13 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
+
+// Try to flush any queued player writes from previous sessions
+try {
+    _processPlayerWriteQueue().catch(e => console.warn('Erreur flush queue au démarrage:', e));
+} catch (e) {
+    console.warn('Impossible de lancer le flush de la queue au démarrage', e);
+}
 
 // Configurer le provider pour forcer la sélection de compte
 provider.setCustomParameters({
@@ -440,7 +616,7 @@ window.resetAccount = async () => {
     if (!user) return;
     
     try {
-        await setDoc(doc(db, "players", user.uid), {
+        await safeSetPlayerDoc(user.uid, {
             collection: [],
             packsByGen: {},
             currentBooster: [],
@@ -687,8 +863,8 @@ onAuthStateChanged(auth, async (user) => {
             if (snap.exists() && snap.data().adminNotification) {
                 const notif = snap.data().adminNotification;
                 window.showPopup("Notification Admin", notif.message);
-                // Supprimer la notification après affichage
-                await setDoc(doc(db, "players", user.uid), { adminNotification: null }, { merge: true });
+                // Supprimer la notification après affichage (utiliser safe write)
+                await safeSetPlayerDoc(user.uid, { adminNotification: null }, { merge: true });
             }
             
             // 3. Charger le classeur (Gen par défaut)
@@ -759,7 +935,7 @@ async function fetchUserCollection(uid) {
         } else {
             // Le compte n'existe pas en Firestore -> Recréer automatiquement
             console.log("Document joueur inexistant, création...");
-            await setDoc(doc(db, "players", uid), {
+            await safeSetPlayerDoc(uid, {
                 email: auth.currentUser.email,
                 collection: [],
                 packsByGen: {},
@@ -768,7 +944,7 @@ async function fetchUserCollection(uid) {
                 role: 'player',
                 points: 0,
                 bonusPacks: 0
-            });
+            }, { merge: true });
             userCollection = [];
             const countEl = document.getElementById('card-count');
             if(countEl) countEl.innerText = 0;
@@ -825,11 +1001,27 @@ async function updatePointsDisplay() {
     const bonusInfoEl = document.getElementById('bonus-packs-info');
     const bonusCountEl = document.getElementById('bonus-packs-count');
     const bonusPluralEl = document.getElementById('bonus-plural');
+    const bonusBtnContent = document.querySelector('#bonus-packs-info .bonus-btn-content');
     
     if (bonusInfoEl && bonusCountEl) {
         if (bonusPacks > 0) {
             bonusInfoEl.style.display = 'block';
             bonusCountEl.textContent = bonusPacks;
+
+            // Formuler correctement au singulier / pluriel pour le bouton
+            // Exemples : "Utiliser votre booster bonus (1 disponible)" ou "Utiliser vos boosters bonus (2 disponibles)"
+            if (bonusBtnContent) {
+                const pronoun = bonusPacks === 1 ? 'votre' : 'vos';
+                const noun = bonusPacks === 1 ? 'booster bonus' : 'boosters bonus';
+                const dispo = bonusPacks === 1 ? 'disponible' : 'disponibles';
+                const label = `${pronoun} ${noun} (${bonusPacks} ${dispo})`;
+                // Rebuild content keeping the icon and same classes
+                bonusBtnContent.innerHTML = `
+                    <img src="assets/icons/gift.svg" class="title-icon" alt="gift">
+                    <span>Utiliser ${label}</span>
+                `;
+            }
+
             if (bonusPluralEl) {
                 bonusPluralEl.textContent = bonusPacks > 1 ? 's' : '';
             }
@@ -1400,7 +1592,6 @@ window.drawCard = async (overridePackQuantity = null, options = {}) => {
 
         // Sauvegarde Firebase
         const updateData = { 
-            collection: arrayUnion(...tempBoosterCards),
             currentBooster: tempBoosterCards, // Sauvegarde de l'ouverture en cours
             boosterRevealedCards: [] // Aucune carte révélée au départ
         };
@@ -1447,8 +1638,8 @@ window.drawCard = async (overridePackQuantity = null, options = {}) => {
         
         updateData.packsByGen = packsByGen;
         
-        // Utiliser setDoc avec merge pour créer le document s'il n'existe pas
-        await setDoc(doc(db, "players", user.uid), updateData, { merge: true });
+        // Utiliser safeSetPlayerDoc pour gérer les erreurs de quota et mettre en file si nécessaire
+        await safeSetPlayerDoc(user.uid, updateData, { merge: true });
 
         // Ajout à la collection locale
         userCollection.push(...tempBoosterCards);
@@ -1500,7 +1691,7 @@ function openBoosterVisual(alreadyRevealed = []) {
     container.innerHTML = '';
     // Réserver l'espace du bouton sans agrandir la page quand il apparaît
     showCloseButton(false);
-    revealAllBtn.style.display = 'inline-block';
+    revealAllBtn.style.display = 'flex';
     overlay.style.display = 'flex';
     // Mark booster as open in URL state
     window._openBooster = true;
@@ -1594,17 +1785,12 @@ function openBoosterVisual(alreadyRevealed = []) {
                 flipCard.classList.add('flipped');
                 cardsRevealed++;
                 
-                // Sauvegarder la carte révélée dans Firestore
+                // Sauvegarder la carte révélée en buffer et planifier un flush (debounced)
                 alreadyRevealed.push(index);
                 const user = auth.currentUser;
                 if (user) {
-                    try {
-                        await setDoc(doc(db, "players", user.uid), {
-                            boosterRevealedCards: alreadyRevealed
-                        }, { merge: true });
-                    } catch (e) {
-                        console.error("Erreur sauvegarde révélation:", e);
-                    }
+                    _pendingRevealed = _pendingRevealed ? _pendingRevealed.concat(index) : [index];
+                    _scheduleSaveRevealed(user.uid);
                 }
                 
                 // Si tout est révélé, on montre le bouton OK
@@ -1647,6 +1833,8 @@ function showCloseButton(show) {
 // Révéler toutes les cartes d'un coup
 window.revealAllCards = async () => {
     const flipCards = document.querySelectorAll('.flip-card:not(.flipped)');
+    const revealBtn = document.getElementById('reveal-all-btn');
+    if (revealBtn) revealBtn.style.display = 'none';
     const user = auth.currentUser;
     
     flipCards.forEach((card, index) => {
@@ -1659,9 +1847,10 @@ window.revealAllCards = async () => {
     if (user) {
         try {
             const allIndices = Array.from({length: tempBoosterCards.length}, (_, i) => i);
-            await setDoc(doc(db, "players", user.uid), {
-                boosterRevealedCards: allIndices
-            }, { merge: true });
+            // push into pending buffer and flush quickly
+            _pendingRevealed = allIndices;
+            // force immediate flush
+            await _flushPendingRevealed(user.uid);
         } catch (e) {
             console.error("Erreur sauvegarde révélation complète:", e);
         }
@@ -1692,7 +1881,33 @@ window.closeBooster = async () => {
     const user = auth.currentUser;
     if (user) {
         try {
-            await setDoc(doc(db, "players", user.uid), {
+            // Ensure any pending revealed indices are flushed before clearing
+            await _flushPendingRevealed(user.uid);
+
+            // Ajouter les cartes ouvertes à la collection en une seule écriture
+            // (réduit les écritures fréquentes qui causaient des erreurs de quota)
+            try {
+                if (Array.isArray(tempBoosterCards) && tempBoosterCards.length > 0) {
+                    try {
+                        // Try immediate write first
+                        await setDoc(doc(db, 'players', user.uid), { collection: arrayUnion(...tempBoosterCards) }, { merge: true });
+                    } catch (e) {
+                        const isQuota = (e && e.code && e.code === 'resource-exhausted') || (e && typeof e.message === 'string' && e.message.toLowerCase().includes('quota'));
+                        if (isQuota) {
+                            // Fallback: enqueue a merged add-to-collection operation
+                            console.warn('Quota lors de l\'ajout à la collection — mise en file (addToCollection)', { uid: user.uid, count: tempBoosterCards.length });
+                            _enqueueCollectionAdd(user.uid, tempBoosterCards);
+                        } else {
+                            console.error("Erreur ajout collection à la fermeture du booster:", e);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Erreur ajout collection à la fermeture du booster (outer):", e);
+            }
+
+            // Nettoyer l'état du booster en cours dans Firestore
+            await safeSetPlayerDoc(user.uid, {
                 currentBooster: [],
                 boosterRevealedCards: []
             }, { merge: true });
@@ -1734,7 +1949,7 @@ async function regeneratePacksForGen(uid, currentGen, packsByGen) {
         lastDrawTime: 0
     };
     
-    await setDoc(doc(db, "players", uid), { 
+    await safeSetPlayerDoc(uid, { 
         packsByGen: packsByGen
     }, { merge: true });
     
@@ -1908,9 +2123,7 @@ window.requestNotification = async () => {
             const user = auth.currentUser;
             if (user) {
                 try {
-                    await setDoc(doc(db, "players", user.uid), {
-                        notificationsEnabled: true
-                    }, { merge: true });
+                    await safeSetPlayerDoc(user.uid, { notificationsEnabled: true }, { merge: true });
                 } catch (error) {
                     Logger.error('Erreur lors de la sauvegarde de la préférence de notification', error);
                 }
@@ -1968,7 +2181,7 @@ window.toggleNotifications = async () => {
 
         if (current) {
             // Désactiver
-            await setDoc(doc(db, 'players', user.uid), { notificationsEnabled: false }, { merge: true });
+            await safeSetPlayerDoc(user.uid, { notificationsEnabled: false }, { merge: true });
             updateBellIcon();
             window.showPopup('Notifications', 'Notifications désactivées.');
         } else {
@@ -2135,7 +2348,7 @@ async function authUser(promise) {
         const ref = doc(db, "players", res.user.uid);
         const snap = await getDoc(ref);
         if (!snap.exists()) {
-            await setDoc(ref, {
+            await safeSetPlayerDoc(res.user.uid, {
                 email: res.user.email,
                 collection: [],
                 packsByGen: {},
@@ -2143,7 +2356,7 @@ async function authUser(promise) {
                 availablePacks: PACKS_PER_COOLDOWN,
                 points: 0,
                 bonusPacks: 0
-            });
+            }, { merge: true });
         }
     } catch (e) {
         console.error('Auth error:', e);
