@@ -397,7 +397,7 @@ async function getPlayerDoc(uid) {
         .single();
     
     if (error && error.code !== SUPABASE_ERROR_NOT_FOUND) {
-        console.error('Error fetching player:', error);
+        console.error('Error fetching player for uid:', uid, error);
         throw error;
     }
     
@@ -730,7 +730,12 @@ window.resetAccount = async () => {
         return;
     }
     
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data.user) {
+        console.error('Error getting user:', error);
+        return;
+    }
+    const user = data.user;
     if (!user) return;
     
     try {
@@ -760,7 +765,12 @@ window.deleteAccount = async () => {
         return;
     }
     
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data.user) {
+        console.error('Error getting user:', error);
+        return;
+    }
+    const user = data.user;
     if (!user) return;
     
     try {
@@ -792,7 +802,12 @@ window.updatePackQuantity = async () => {
     const select = document.getElementById('pack-quantity');
     const btn = document.getElementById('btn-draw');
     const quantity = parseInt(select.value) || 0; // Ensure quantity is a number
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+        console.error('Error getting user:', error);
+        return;
+    }
+    const user = data?.user;
     const isAdmin = user && (user.email === ADMIN_EMAIL);
     
     // Vérifier si l'utilisateur a assez de packs

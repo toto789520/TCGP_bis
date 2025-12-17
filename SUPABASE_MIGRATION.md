@@ -60,7 +60,14 @@ Le fichier `migrate-data.html` contient un outil pour importer vos données:
 2. Cliquez sur "Import Players Data" et sélectionnez `backups/backup_players.json`
 3. Attendez que l'import se termine
 
-Note: L'authentification Google nécessite que les utilisateurs se reconnectent une fois pour créer leur compte Supabase Auth.
+**⚠️ IMPORTANT**: L'authentification Google nécessite que les utilisateurs se reconnectent une fois pour créer leur compte Supabase Auth. Les données des joueurs ne seront visibles qu'après leur reconnexion, car Supabase a besoin de lier leurs données à leur compte d'authentification.
+
+### 4.2 Informer vos utilisateurs
+
+Après la migration, tous les utilisateurs doivent:
+1. Se reconnecter à l'application
+2. Utiliser la même méthode de connexion qu'avant (Google ou Email/Password)
+3. Leurs données seront automatiquement restaurées après la connexion
 
 ## Étape 5: Tester l'application
 
