@@ -1,0 +1,32 @@
+# Supabase configuration (contains sensitive API keys)
+# Copy supabase-config.js.template to supabase-config.js and add your keys
+supabase-config.js
+
+# Node modules (if you add npm in the future)
+node_modules/
+npm-debug.log*
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Build outputs (if you add a build process)
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+.env.production

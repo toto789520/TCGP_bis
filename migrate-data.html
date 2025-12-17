@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Migration Firebase → Supabase</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2rem;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f7f9fc;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        .section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+        .section p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        .file-input {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            background: white;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-right: 10px;
+            margin-top: 10px;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .progress {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 15px 0;
+            display: none;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .warning strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Migration Firebase → Supabase</h1>
+        <p class="subtitle">Outil de migration des données des backups Firebase vers Supabase</p>
+
+        <div class="warning">
+            <strong>⚠️ Avant de commencer :</strong>
+            <ul style="margin-left: 20px; margin-top: 10px;">
+                <li>Assurez-vous d'avoir exécuté le script SQL <code>supabase-schema.sql</code> dans Supabase</li>
+                <li>Configurez votre clé API dans <code>supabase-config.js</code></li>
+                <li>Cette opération va importer les données des joueurs depuis les backups</li>
+                <li><strong>Important:</strong> Les utilisateurs doivent se reconnecter après l'import pour lier leurs comptes Supabase Auth. Les données ne seront pas visibles tant qu'ils ne se sont pas reconnectés.</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>📦 1. Importer les données des joueurs</h2>
+            <p>Sélectionnez le fichier <code>backups/backup_players.json</code></p>
+            <div class="file-input">
+                <label for="players-file">Fichier backup_players.json :</label>
+                <input type="file" id="players-file" accept=".json">
+            </div>
+            <button id="import-players-btn" onclick="importPlayers()">Importer les joueurs</button>
+        </div>
+
+        <div class="progress" id="progress">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="section">
+            <h2>📊 Statistiques</h2>
+            <p id="stats">Aucune importation effectuée</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        import { SUPABASE_CONFIG } from './supabase-config.js';
+
+        const supabase = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status ' + type;
+            status.style.display = 'block';
+        }
+
+        function updateProgress(percent) {
+            const progress = document.getElementById('progress');
+            const bar = document.getElementById('progress-bar');
+            progress.style.display = 'block';
+            bar.style.width = percent + '%';
+        }
+
+        window.importPlayers = async function() {
+            const fileInput = document.getElementById('players-file');
+            const btn = document.getElementById('import-players-btn');
+            
+            if (!fileInput.files.length) {
+                showStatus('⚠️ Veuillez sélectionner un fichier', 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            showStatus('📖 Lecture du fichier...', 'info');
+
+            try {
+                const file = fileInput.files[0];
+                const text = await file.text();
+                const players = JSON.parse(text);
+
+                showStatus(`🔄 Import de ${players.length} joueurs en cours...`, 'info');
+                updateProgress(0);
+
+                let imported = 0;
+                let errors = 0;
+                let skipped = 0;
+
+                for (let i = 0; i < players.length; i++) {
+                    const player = players[i];
+                    
+                    try {
+                        // Mapping des champs Firebase vers Supabase
+                        const playerData = {
+                            email: player.email,
+                            collection: player.collection || [],
+                            packs_by_gen: player.packsByGen || player.packs_by_gen || {},
+                            last_draw_time: player.lastDrawTime || player.last_draw_time || 0,
+                            available_packs: player.availablePacks || player.available_packs || 3,
+                            role: player.role || 'player',
+                            points: player.points || 0,
+                            bonus_packs: player.bonusPacks || player.bonus_packs || 0,
+                            current_booster: player.currentBooster || player.current_booster || [],
+                            booster_revealed_cards: player.boosterRevealedCards || player.booster_revealed_cards || [],
+                            notifications_enabled: player.notificationsEnabled || player.notifications_enabled || false,
+                            admin_notification: player.adminNotification || player.admin_notification || null
+                        };
+
+                        // Note: user_id sera null car on n'a pas d'utilisateur Firebase Auth ici
+                        // Les utilisateurs devront se reconnecter pour créer leur compte Supabase
+                        // On stocke l'email pour référence
+
+                        // Vérifier si le joueur existe déjà (par email)
+                        const { data: existing } = await supabase
+                            .from('players')
+                            .select('id')
+                            .eq('email', player.email)
+                            .single();
+
+                        if (existing) {
+                            // Update existing player
+                            await supabase
+                                .from('players')
+                                .update(playerData)
+                                .eq('id', existing.id);
+                            imported++;
+                        } else {
+                            // Create note: this will fail without user_id, 
+                            // users need to login first to create auth accounts
+                            console.log(`Skipping ${player.email} - user must login first`);
+                            skipped++;
+                        }
+
+                        updateProgress(Math.round((i + 1) / players.length * 100));
+                    } catch (err) {
+                        console.error(`Erreur pour ${player.email}:`, err);
+                        errors++;
+                    }
+                }
+
+                updateProgress(100);
+                showStatus(
+                    `✅ Migration terminée ! ${imported} joueurs mis à jour, ${skipped} ignorés (doivent se connecter d'abord), ${errors} erreurs.
+                    
+                    ⚠️ Note: Les ${skipped} joueurs ignorés doivent se connecter pour créer leurs comptes Supabase Auth.`,
+                    'success'
+                );
+                document.getElementById('stats').innerHTML = `
+                    <strong>Import terminé :</strong><br>
+                    ✅ ${imported} joueurs mis à jour<br>
+                    ⏭️ ${skipped} joueurs ignorés (doivent se connecter)<br>
+                    ${errors > 0 ? `❌ ${errors} erreurs<br>` : ''}
+                    📧 Les ${skipped} joueurs ignorés doivent se connecter pour créer leur compte Supabase Auth avant que leurs données puissent être importées
+                `;
+
+            } catch (error) {
+                console.error(error);
+                showStatus(`❌ Erreur: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // Test de connexion Supabase
+        async function testSupabaseConnection() {
+            try {
+                const { error } = await supabase.from('players').select('*', { count: 'exact', head: true });
+                if (error) {
+                    if (error.message.includes('JWT')) {
+                        showStatus('⚠️ Configuration Supabase manquante. Vérifiez supabase-config.js', 'error');
+                    } else {
+                        showStatus('⚠️ Erreur de connexion à Supabase: ' + error.message, 'error');
+                    }
+                } else {
+                    showStatus('✅ Connexion à Supabase OK', 'success');
+                    setTimeout(() => {
+                        document.getElementById('status').style.display = 'none';
+                    }, 3000);
+                }
+            } catch (e) {
+                showStatus('❌ Impossible de se connecter à Supabase. Vérifiez votre configuration.', 'error');
+            }
+        }
+        testSupabaseConnection();
+    </script>
+</body>
+</html>
