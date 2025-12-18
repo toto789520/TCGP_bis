@@ -16,24 +16,51 @@ window.showPopup = (title, msg) => {
 };
 window.closePopup = () => { document.getElementById('custom-popup-overlay').style.display = 'none'; };
 
-// VÉRIFICATION VIA BDD
-supabase.auth.onAuthStateChange(async (event, session) => {
+// Fonction de vérification des droits admin
+async function checkAdminRights() {
     const loader = document.getElementById('global-loader');
-    const user = session?.user;
-    if (user) {
-        const { data } = await supabase
+    
+    try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) throw sessionError;
+        
+        const user = session?.user;
+        if (!user) {
+            window.location.href = "index.html";
+            return;
+        }
+
+        const { data, error } = await supabase
             .from('players')
             .select('role')
             .eq('_id', user.id)
             .single();
             
+        if (error) {
+            console.error('Erreur lors de la vérification du rôle:', error);
+            window.location.href = "index.html";
+            return;
+        }
+        
         if (data && data.role === 'admin') {
             loader.style.display = 'none';
             loadAllPlayers();
         } else {
             window.location.href = "index.html"; // Pas admin -> Dehors
         }
-    } else {
+    } catch (e) {
+        console.error('Erreur lors de la vérification:', e);
+        window.location.href = "index.html";
+    }
+}
+
+// Vérifier immédiatement au chargement
+checkAdminRights();
+
+// VÉRIFICATION VIA BDD - écouter les changements d'auth
+supabase.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_OUT') {
         window.location.href = "index.html";
     }
 });
@@ -46,7 +73,7 @@ window.loadAllPlayers = async () => {
         const { data: players, error } = await supabase
             .from('players')
             .select('*')
-            .order('created_at', { ascending: false });
+            .order('createdat', { ascending: false });
             
         if (error) throw error;
         

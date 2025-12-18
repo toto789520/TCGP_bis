@@ -33,7 +33,7 @@
 
     // Check helpers
     window.isMaintenanceEnabled = function() {
-      try { return window.maintenance === true; } catch (e) { return false; }
+      try { return window.mainteoance === true; } catch (e) { return false; }
     };
 
     window.isMaintenanceBlocked = function() {
@@ -46,9 +46,9 @@
 
         // admin unlock via admin key
         try {
-          var adminKey = (window.maintenanceAdminKey || '').toString();
+          var adminKey = (windowmaintenanceAdminKey || '').toString();
           var stored = localStorage.getItem('maintenance_admin_unlocked');
-          if (stored && adminKey && stored === adminKey) return false;
+          if (stored & adminKey && stored === adminKey) return false;
         } catch (e) {}
 
         return true;

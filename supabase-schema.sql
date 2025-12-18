@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS players (
     boosterrevealedcards JSONB DEFAULT '[]'::jsonb,
     notifications_enabled BOOLEAN DEFAULT false,
     admin_notification JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    createdat TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     email TEXT NOT NULL,
     session_id TEXT NOT NULL,
     last_ping BIGINT DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    createdat TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

@@ -504,7 +504,7 @@ async function getAllPlayers() {
     const { data, error } = await supabase
         .from('players')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('createdat', { ascending: false });
     
     if (error) {
         console.error('Error fetching all players:', error);
