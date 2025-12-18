@@ -120,26 +120,26 @@ window.toggleRole = async (_id, currentRole) => {
 window.resetCooldown = async (_id, email) => {
     try {
         // Reset cooldowns pour toutes les générations
-        const packs_by_gen = {};
+        const packsbygen = {};
         for (let i = 1; i <= 7; i++) {
-            packs_by_gen[`gen${i}`] = {
-                available_packs: 3,
-                last_draw_time: 0,
+            packsbygen[`gen${i}`] = {
+                availablepacks: 3,
+                lastdrawtime: 0,
                 points: 0,
-                bonus_packs: 0
+                bonuspacks: 0
             };
         }
-        packs_by_gen['special_bryan'] = {
-            available_packs: 3,
-            last_draw_time: 0,
+        packsbygen['special_bryan'] = {
+            availablepacks: 3,
+            lastdrawtime: 0,
             points: 0,
-            bonus_packs: 0
+            bonuspacks: 0
         };
 
         const { error } = await supabase
             .from('players')
             .update({
-                packs_by_gen: packs_by_gen,
+                packsbygen: packsbygen,
                 admin_notification: {
                     type: 'cooldown_reset',
                     message: '<img src="assets/icons/zap.svg" class="title-icon" alt="zap"> Tous vos cooldowns ont été réinitialisés par un administrateur !',
@@ -163,8 +163,8 @@ window.resetPlayer = async (_id, email) => {
             .from('players')
             .update({ 
                 collection: [], 
-                last_draw_time: 0, 
-                packs_by_gen: {} 
+                lastdrawtime: 0, 
+                packsbygen: {} 
             })
             .eq('_id', _id);
             

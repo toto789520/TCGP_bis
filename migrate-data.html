@@ -239,14 +239,14 @@
                         const playerData = {
                             email: player.email,
                             collection: player.collection || [],
-                            packs_by_gen: player.packsByGen || player.packs_by_gen || {},
-                            last_draw_time: player.lastDrawTime || player.last_draw_time || 0,
-                            available_packs: player.availablePacks || player.available_packs || 3,
+                            packsbygen: player.packsByGen || player.packsbygen || {},
+                            lastdrawtime: player.lastDrawTime || player.lastdrawtime || 0,
+                            availablepacks: player.availablePacks || player.availablepacks || 3,
                             role: player.role || 'player',
                             points: player.points || 0,
-                            bonus_packs: player.bonusPacks || player.bonus_packs || 0,
-                            current_booster: player.currentBooster || player.current_booster || [],
-                            booster_revealed_cards: player.boosterRevealedCards || player.booster_revealed_cards || [],
+                            bonuspacks: player.bonusPacks || player.bonuspacks || 0,
+                            currentbooster: player.currentBooster || player.currentbooster || [],
+                            boosterrevealedcards: player.boosterRevealedCards || player.boosterrevealedcards || [],
                             notifications_enabled: player.notificationsEnabled || player.notifications_enabled || false,
                             admin_notification: player.adminNotification || player.admin_notification || null
                         };

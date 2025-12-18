@@ -11,13 +11,13 @@ CREATE TABLE IF NOT EXISTS players (
     email TEXT NOT NULL,
     role TEXT DEFAULT 'player' CHECK (role IN ('player', 'vip', 'admin')),
     collection JSONB DEFAULT '[]'::jsonb,
-    packs_by_gen JSONB DEFAULT '{}'::jsonb,
-    last_draw_time BIGINT DEFAULT 0,
-    available_packs INTEGER DEFAULT 3,
+    packsbygen JSONB DEFAULT '{}'::jsonb,
+    lastdrawtime BIGINT DEFAULT 0,
+    availablepacks INTEGER DEFAULT 3,
     points INTEGER DEFAULT 0,
-    bonus_packs INTEGER DEFAULT 0,
-    current_booster JSONB DEFAULT '[]'::jsonb,
-    booster_revealed_cards JSONB DEFAULT '[]'::jsonb,
+    bonuspacks INTEGER DEFAULT 0,
+    currentbooster JSONB DEFAULT '[]'::jsonb,
+    boosterrevealedcards JSONB DEFAULT '[]'::jsonb,
     notifications_enabled BOOLEAN DEFAULT false,
     admin_notification JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -169,7 +169,7 @@ BEGIN
     
     -- If not exists, create new player
     IF player_id IS NULL THEN
-        INSERT INTO players (_id, email, role, collection, packs_by_gen, points, bonus_packs)
+        INSERT INTO players (_id, email, role, collection, packsbygen, points, bonuspacks)
         VALUES (p_user_id, p_email, 'player', '[]'::jsonb, '{}'::jsonb, 0, 0)
         RETURNING id INTO player_id;
     END IF;

@@ -68,7 +68,7 @@ async function _flushPendingRevealed(_id) {
     clearTimeout(_saveBoosterTimer);
     _saveBoosterTimer = null;
     try {
-        await safeSetPlayerDoc(_id, { booster_revealed_cards: toSave }, { merge: true });
+        await safeSetPlayerDoc(_id, { boosterrevealedcards: toSave }, { merge: true });
     } catch (e) {
         console.error('Erreur sauvegarde (batch) révélation:', e);
     }
@@ -741,11 +741,11 @@ window.resetAccount = async () => {
     try {
         await safeSetPlayerDoc(user.id, {
             collection: [],
-            packs_by_gen: {},
-            current_booster: [],
-            booster_revealed_cards: [],
-            last_draw_time: 0,
-            available_packs: PACKS_PER_COOLDOWN
+            packsbygen: {},
+            currentbooster: [],
+            boosterrevealedcards: [],
+            lastdrawtime: 0,
+            availablepacks: PACKS_PER_COOLDOWN
         }, { merge: true });
         
         closePopup();
@@ -811,7 +811,7 @@ window.updatePackQuantity = async () => {
     const isAdmin = user && (user.email === ADMIN_EMAIL);
     
     // Vérifier si l'utilisateur a assez de packs
-    let available_packs = PACKS_PER_COOLDOWN;
+    let availablepacks = PACKS_PER_COOLDOWN;
     if (user && !isAdmin && btn) {
         const genSelect = document.getElementById('gen-select');
         const selectedGen = genSelect.value;
@@ -819,12 +819,12 @@ window.updatePackQuantity = async () => {
         try {
             const snap = await getPlayerDoc(user.id);
             if (snap.exists()) {
-                const packs_by_gen = snap.data().packs_by_gen || {};
-                const genData = packs_by_gen[selectedGen] || { available_packs: PACKS_PER_COOLDOWN };
-                available_packs = genData.available_packs ?? PACKS_PER_COOLDOWN;
+                const packsbygen = snap.data().packsbygen || {};
+                const genData = packsbygen[selectedGen] || { availablepacks: PACKS_PER_COOLDOWN };
+                availablepacks = genData.availablepacks ?? PACKS_PER_COOLDOWN;
                 
                 // Désactiver le bouton si pas assez de packs, sinon le réactiver
-                if (available_packs < quantity) {
+                if (availablepacks < quantity) {
                     btn.disabled = true;
                     btn.classList.add('disabled');
                 } else {
@@ -849,7 +849,7 @@ window.updatePackQuantity = async () => {
     // Mettre à jour l'affichage du nombre de packs disponibles
     const packsInfo = document.getElementById('packs-info');
     if (packsInfo && user && !isAdmin) {
-        packsInfo.textContent = `(${available_packs}/${PACKS_PER_COOLDOWN} disponibles)`;
+        packsInfo.textContent = `(${availablepacks}/${PACKS_PER_COOLDOWN} disponibles)`;
     }
 };
 
@@ -1019,11 +1019,11 @@ supabase.auth.onAuthStateChange(async (event, session) => {
             // 2. Vérifier si un booster est en cours d'ouverture
             const snap = await getPlayerDoc(user.id);
             const playerData = snap.data();
-            if (snap.exists() && playerData.current_booster && playerData.current_booster.length > 0) {
+            if (snap.exists() && playerData.currentbooster && playerData.currentbooster.length > 0) {
                 // Restaurer l'ouverture en cours
                 Logger.info('Restauration booster en cours');
-                tempBoosterCards = playerData.current_booster;
-                const revealedCards = playerData.booster_revealed_cards || [];
+                tempBoosterCards = playerData.currentbooster;
+                const revealedCards = playerData.boosterrevealedcards || [];
                 openBoosterVisual(revealedCards);
             }
             
@@ -1215,12 +1215,12 @@ async function fetchUserCollection(_id) {
             await safeSetPlayerDoc(_id, {
                 email: data.user.email,
                 collection: [],
-                packs_by_gen: {},
-                last_draw_time: 0,
-                available_packs: PACKS_PER_COOLDOWN,
+                packsbygen: {},
+                lastdrawtime: 0,
+                availablepacks: PACKS_PER_COOLDOWN,
                 role: 'player',
                 points: 0,
-                bonus_packs: 0
+                bonuspacks: 0
             }, { merge: true });
             userCollection = [];
             const countEl = document.getElementById('card-count');
@@ -1255,10 +1255,10 @@ async function updatePointsDisplay() {
     const currentGen = genSelect ? genSelect.value : 'gen7';
     
     // Récupérer les données de la génération active
-    const packs_by_gen = data.packs_by_gen || {};
-    const genData = packs_by_gen[currentGen] || { points: 0, bonus_packs: 0 };
+    const packsbygen = data.packsbygen || {};
+    const genData = packsbygen[currentGen] || { points: 0, bonuspacks: 0 };
     const points = genData.points || 0;
-    const bonus_packs = genData.bonus_packs || 0;
+    const bonuspacks = genData.bonuspacks || 0;
     // Seuil de points pour cet utilisateur (VIP = 20)
     const pointsForThisUser = (data.role === 'vip') ? 20 : POINTS_FOR_BONUS_PACK;
     // Mettre à jour la valeur des points
@@ -1281,17 +1281,17 @@ async function updatePointsDisplay() {
     const bonusBtnContent = document.querySelector('#bonus-packs-info .bonus-btn-content');
     
     if (bonusInfoEl && bonusCountEl) {
-        if (bonus_packs > 0) {
+        if (bonuspacks > 0) {
             bonusInfoEl.style.display = 'block';
-            bonusCountEl.textContent = bonus_packs;
+            bonusCountEl.textContent = bonuspacks;
 
             // Formuler correctement au singulier / pluriel pour le bouton
             // Exemples : "Utiliser votre booster bonus (1 disponible)" ou "Utiliser vos boosters bonus (2 disponibles)"
             if (bonusBtnContent) {
-                const pronoun = bonus_packs === 1 ? 'votre' : 'vos';
-                const noun = bonus_packs === 1 ? 'booster bonus' : 'boosters bonus';
-                const dispo = bonus_packs === 1 ? 'disponible' : 'disponibles';
-                const label = `${pronoun} ${noun} (${bonus_packs} ${dispo})`;
+                const pronoun = bonuspacks === 1 ? 'votre' : 'vos';
+                const noun = bonuspacks === 1 ? 'booster bonus' : 'boosters bonus';
+                const dispo = bonuspacks === 1 ? 'disponible' : 'disponibles';
+                const label = `${pronoun} ${noun} (${bonuspacks} ${dispo})`;
                 // Rebuild content keeping the icon and same classes
                 bonusBtnContent.innerHTML = `
                     <img src="assets/icons/gift.svg" class="title-icon" alt="gift">
@@ -1300,7 +1300,7 @@ async function updatePointsDisplay() {
             }
 
             if (bonusPluralEl) {
-                bonusPluralEl.textContent = bonus_packs > 1 ? 's' : '';
+                bonusPluralEl.textContent = bonuspacks > 1 ? 's' : '';
             }
         } else {
             bonusInfoEl.style.display = 'none';
@@ -1321,17 +1321,17 @@ window.useBonusPack = async () => {
     const currentGen = genSelect ? genSelect.value : 'gen7';
     
     // Récupérer les données de la génération active
-    const packs_by_gen = data.packs_by_gen || {};
-    const genData = packs_by_gen[currentGen] || { points: 0, bonus_packs: 0 };
-    const bonus_packs = genData.bonus_packs || 0;
+    const packsbygen = data.packsbygen || {};
+    const genData = packsbygen[currentGen] || { points: 0, bonuspacks: 0 };
+    const bonuspacks = genData.bonuspacks || 0;
     
-    if (bonus_packs <= 0) {
+    if (bonuspacks <= 0) {
         window.showPopup("Pas de bonus", "Vous n'avez pas de booster bonus disponible pour cette génération.");
         return;
     }
     // Ouvrir autant de boosters que de boosters bonus accumulés
     // drawCard gère la consommation des bonus quand on passe { isBonus: true }
-    await drawCard(bonus_packs, { isBonus: true });
+    await drawCard(bonuspacks, { isBonus: true });
 }
 
 // Fonction pour ouvrir la boutique
@@ -1345,17 +1345,17 @@ window.openShop = async () => {
     const data = snap.data();
     const genSelect = document.getElementById('gen-select');
     const currentGen = genSelect ? genSelect.value : 'gen7';
-    const packs_by_gen = data.packs_by_gen || {};
-    const genData = packs_by_gen[currentGen] || { points: 0, bonus_packs: 0 };
+    const packsbygen = data.packsbygen || {};
+    const genData = packsbygen[currentGen] || { points: 0, bonuspacks: 0 };
     const points = genData.points || 0;
-    const bonus_packs = genData.bonus_packs || 0;
+    const bonuspacks = genData.bonuspacks || 0;
     
     const shopHtml = `
         <div style="text-align: center;">
             <div style="font-size: 3rem; margin: 20px 0;"><img src="assets/icons/gift.svg" class="icon-inline" alt="gift"></div>
                 <div style="font-size: 1.2rem; margin-bottom: 20px;">
                 <strong>Vos points :</strong> ${points}/${pointsForThisUser}<br>
-                <strong>Boosters bonus disponibles :</strong> ${bonus_packs}
+                <strong>Boosters bonus disponibles :</strong> ${bonuspacks}
             </div>
             <div style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 10px; margin: 20px 0;">
                 <p style="margin: 10px 0;"><img src="assets/icons/gem.svg" class="icon-inline" alt="points"> Chaque carte obtenue vous donne <strong>${POINTS_PER_CARD} point</strong></p>
@@ -1369,9 +1369,9 @@ window.openShop = async () => {
                 </div>
                 <p style="color: #ccc; font-size: 0.9rem;">${points} / ${pointsForThisUser} points</p>
             </div>
-            ${bonus_packs > 0 ? `
+            ${bonuspacks > 0 ? `
                 <button onclick="closePopup(); useBonusPack();" class="btn-primary" style="width: 100%; padding: 15px; margin-top: 20px; font-size: 1.1rem;">
-                    <img src="assets/icons/gift.svg" class="icon-inline" alt="gift"> Utiliser un booster bonus (${bonus_packs} disponible${bonus_packs > 1 ? 's' : ''})
+                    <img src="assets/icons/gift.svg" class="icon-inline" alt="gift"> Utiliser un booster bonus (${bonuspacks} disponible${bonuspacks > 1 ? 's' : ''})
                 </button>
             ` : `
                 <p style="color: #999; margin-top: 20px;">Collectionnez plus de cartes pour gagner des boosters bonus !</p>
@@ -1786,12 +1786,12 @@ window.drawCard = async (overridePackQuantity = null, options = {}) => {
     if (!isAdmin && !isBonus) {
         const snap = await getPlayerDoc(user.id);
         if (snap.exists()) {
-            const packs_by_gen = snap.data().packs_by_gen || {};
-            const genData = packs_by_gen[selectedGen] || { available_packs: PACKS_PER_COOLDOWN };
-            const available_packs = genData.available_packs ?? PACKS_PER_COOLDOWN;
+            const packsbygen = snap.data().packsbygen || {};
+            const genData = packsbygen[selectedGen] || { availablepacks: PACKS_PER_COOLDOWN };
+            const availablepacks = genData.availablepacks ?? PACKS_PER_COOLDOWN;
             
-            if (available_packs < packQuantity) {
-                window.showPopup("Pas assez de packs", `Vous voulez ouvrir ${packQuantity} pack(s) mais vous n'en avez que ${available_packs} disponible(s) pour cette génération.`);
+            if (availablepacks < packQuantity) {
+                window.showPopup("Pas assez de packs", `Vous voulez ouvrir ${packQuantity} pack(s) mais vous n'en avez que ${availablepacks} disponible(s) pour cette génération.`);
                 return;
             }
         }
@@ -1869,22 +1869,22 @@ window.drawCard = async (overridePackQuantity = null, options = {}) => {
 
         // Sauvegarde Firebase
         const updateData = { 
-            current_booster: tempBoosterCards, // Sauvegarde de l'ouverture en cours
-            booster_revealed_cards: [] // Aucune carte révélée au départ
+            currentbooster: tempBoosterCards, // Sauvegarde de l'ouverture en cours
+            boosterrevealedcards: [] // Aucune carte révélée au départ
         };
         
         // Récupérer les données actuelles une seule fois
         const currentSnap = await getPlayerDoc(user.id);
         const currentData = currentSnap.exists() ? currentSnap.data() : {};
-        const packs_by_gen = currentData.packs_by_gen || {};
-        const genData = packs_by_gen[selectedGen] || { available_packs: PACKS_PER_COOLDOWN, last_draw_time: 0, points: 0, bonus_packs: 0 };
+        const packsbygen = currentData.packsbygen || {};
+        const genData = packsbygen[selectedGen] || { availablepacks: PACKS_PER_COOLDOWN, lastdrawtime: 0, points: 0, bonuspacks: 0 };
         
         // Si ce n'est pas un bonus, on décrémente les packs disponibles (sauf admin)
         if (!isAdmin && !isBonus) {
-            let available_packs = genData.available_packs ?? PACKS_PER_COOLDOWN;
-            available_packs = Math.max(0, available_packs - packQuantity);
-            genData.available_packs = available_packs;
-            genData.last_draw_time = Date.now();
+            let availablepacks = genData.availablepacks ?? PACKS_PER_COOLDOWN;
+            availablepacks = Math.max(0, availablepacks - packQuantity);
+            genData.availablepacks = availablepacks;
+            genData.lastdrawtime = Date.now();
         }
         
         // Calculer les points gagnés
@@ -1892,7 +1892,7 @@ window.drawCard = async (overridePackQuantity = null, options = {}) => {
         const pointsGained = cardsCount * POINTS_PER_CARD;
         
         const currentPoints = genData.points || 0;
-        const currentBonusPacks = genData.bonus_packs || 0;
+        const currentBonusPacks = genData.bonuspacks || 0;
         
         // Si on utilise des boosters bonus, soustraire la quantité utilisée avant de calculer les gains
         let startingBonusPacks = currentBonusPacks;
@@ -1906,14 +1906,14 @@ window.drawCard = async (overridePackQuantity = null, options = {}) => {
         const earnedBonusPacks = Math.floor(totalPoints / pointsForThisUser);
         const remainingPoints = totalPoints % pointsForThisUser;
         
-        // Mettre à jour les données de cette génération (conserve available_packs et last_draw_time)
-        packs_by_gen[selectedGen] = {
+        // Mettre à jour les données de cette génération (conserve availablepacks et lastdrawtime)
+        packsbygen[selectedGen] = {
             ...genData,
             points: remainingPoints,
-            bonus_packs: startingBonusPacks + earnedBonusPacks
+            bonuspacks: startingBonusPacks + earnedBonusPacks
         };
         
-        updateData.packs_by_gen = packs_by_gen;
+        updateData.packsbygen = packsbygen;
         
         // Utiliser safeSetPlayerDoc pour gérer les erreurs de quota et mettre en file si nécessaire
         await safeSetPlayerDoc(user.id, updateData, { merge: true });
@@ -1936,11 +1936,11 @@ window.drawCard = async (overridePackQuantity = null, options = {}) => {
             // Si plus de packs disponibles pour cette génération, démarrer le timer
             const snap = await getPlayerDoc(user.id);
             if (snap.exists()) {
-                const packs_by_gen = snap.data().packs_by_gen || {};
-                const genData = packs_by_gen[selectedGen] || { available_packs: 0 };
-                const available_packs = genData.available_packs ?? 0;
+                const packsbygen = snap.data().packsbygen || {};
+                const genData = packsbygen[selectedGen] || { availablepacks: 0 };
+                const availablepacks = genData.availablepacks ?? 0;
                 
-                if (available_packs === 0) {
+                if (availablepacks === 0) {
                     const cooldownMins = isVip ? VIP_COOLDOWN_MINUTES : COOLDOWN_MINUTES;
                     startTimer(cooldownMins * 60 * 1000, user.id);
                 }
@@ -2183,8 +2183,8 @@ window.closeBooster = async () => {
 
             // Nettoyer l'état du booster en cours dans Firestore
             await safeSetPlayerDoc(user.id, {
-                current_booster: [],
-                booster_revealed_cards: []
+                currentbooster: [],
+                boosterrevealedcards: []
             }, { merge: true });
         } catch (e) {
             console.error("Erreur nettoyage booster:", e);
@@ -2230,14 +2230,14 @@ window.closeBooster = async () => {
 
 // --- COOLDOWN PAR GÉNÉRATION ---
 // Helper pour régénérer les packs d'une génération
-async function regeneratePacksForGen(_id, currentGen, packs_by_gen) {
-    packs_by_gen[currentGen] = {
-        available_packs: PACKS_PER_COOLDOWN,
-        last_draw_time: 0
+async function regeneratePacksForGen(_id, currentGen, packsbygen) {
+    packsbygen[currentGen] = {
+        availablepacks: PACKS_PER_COOLDOWN,
+        lastdrawtime: 0
     };
     
     await safeSetPlayerDoc(_id, { 
-        packs_by_gen: packs_by_gen
+        packsbygen: packsbygen
     }, { merge: true });
     
     return PACKS_PER_COOLDOWN;
@@ -2250,23 +2250,23 @@ async function checkCooldown(_id) {
     const snap = await getPlayerDoc(_id);
     if (snap.exists()) {
         const data = snap.data();
-        const packs_by_gen = data.packs_by_gen || {};
-        const genData = packs_by_gen[currentGen] || { available_packs: PACKS_PER_COOLDOWN, last_draw_time: 0 };
+        const packsbygen = data.packsbygen || {};
+        const genData = packsbygen[currentGen] || { availablepacks: PACKS_PER_COOLDOWN, lastdrawtime: 0 };
         
-        let available_packs = genData.available_packs ?? PACKS_PER_COOLDOWN;
-        const lastDraw = genData.last_draw_time || 0;
+        let availablepacks = genData.availablepacks ?? PACKS_PER_COOLDOWN;
+        const lastDraw = genData.lastdrawtime || 0;
         
         const diff = Date.now() - lastDraw;
         const cooldownMinutesForUser = (data.role === 'vip') ? VIP_COOLDOWN_MINUTES : COOLDOWN_MINUTES;
         const cooldownMs = cooldownMinutesForUser * 60 * 1000;
         
         // Si le cooldown est passé ET qu'il n'y a plus de packs, régénérer TOUS les packs
-        const wasZero = available_packs <= 0;
+        const wasZero = availablepacks <= 0;
         if (wasZero && diff >= cooldownMs) {
-            available_packs = await regeneratePacksForGen(_id, currentGen, packs_by_gen);
+            availablepacks = await regeneratePacksForGen(_id, currentGen, packsbygen);
         }
         
-        if (available_packs > 0) {
+        if (availablepacks > 0) {
             enableBoosterButton(true);
             // Vérifier si on peut ouvrir le nombre de packs sélectionné
             await updatePackQuantity();
@@ -2279,9 +2279,9 @@ async function checkCooldown(_id) {
             } else {
                 // Si le temps est déjà passé mais qu'on arrive ici, forcer la régénération
                 // (Ne devrait normalement pas arriver grâce au check ci-dessus)
-                available_packs = await regeneratePacksForGen(_id, currentGen, packs_by_gen);
+                availablepacks = await regeneratePacksForGen(_id, currentGen, packsbygen);
                 await updatePackQuantity();
-                updatePacksDisplay(available_packs, true);
+                updatePacksDisplay(availablepacks, true);
                 enableBoosterButton(true);
             }
         }
@@ -2543,12 +2543,12 @@ window.signUp = async () => {
             await setPlayerDoc(data.user.id, {
                 email: email,
                 collection: [],
-                packs_by_gen: {},
-                last_draw_time: 0,
-                available_packs: PACKS_PER_COOLDOWN,
+                packsbygen: {},
+                lastdrawtime: 0,
+                availablepacks: PACKS_PER_COOLDOWN,
                 role: 'player',
                 points: 0,
-                bonus_packs: 0
+                bonuspacks: 0
             });
         }
         
