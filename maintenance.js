@@ -11,15 +11,15 @@
     window.setMaintenanceBypass = function(durationMs) {
       try {
         localStorage.setItem('maintenance_client_override', '1');
-        console.info('Maintenance bypass enabled for this client');
+        console.info('Bypass de maintenance activé pour ce client');
         if (typeof durationMs === 'number' && durationMs > 0) {
           setTimeout(function(){
-            try { localStorage.removeItem('maintenance_client_override'); console.info('Maintenance bypass expired and was removed'); } catch(e){}
+            try { localStorage.removeItem('maintenance_client_override'); console.info('Le bypass de maintenance a expiré et a été supprimé'); } catch(e){}
           }, durationMs);
         }
-      } catch (e) { console.warn('Could not set maintenance bypass', e); }
+      } catch (e) { console.warn('Impossible d\'activer le bypass de maintenance', e); }
     };
-    window.clearMaintenanceBypass = function() { try { localStorage.removeItem('maintenance_client_override'); console.info('Maintenance bypass removed for this client'); } catch(e) { console.warn('Could not clear maintenance bypass', e); } };
+    window.clearMaintenanceBypass = function() { try { localStorage.removeItem('maintenance_client_override'); console.info('Bypass de maintenance supprimé pour ce client'); } catch(e) { console.warn('Impossible de supprimer le bypass de maintenance', e); } };
     window.hasMaintenanceBypass = function() { try { return localStorage.getItem('maintenance_client_override') === '1'; } catch(e){ return false; } };
 
     // Short aliases for convenience
@@ -61,22 +61,22 @@
     // Dynamic help: prints available maintenance console commands and usage
     window.maintenanceHelp = function() {
       var cmds = [
-        {k: 'setMaintenanceBypass(durationMs?)', d: 'Enable client-only bypass (persisted in localStorage). Optional duration in ms.'},
-        {k: 'clearMaintenanceBypass()', d: 'Remove client bypass.'},
-        {k: 'hasMaintenanceBypass()', d: 'Returns true if client bypass is active.'},
-        {k: 'setMB / smb(durationMs?)', d: 'Alias for setMaintenanceBypass.'},
-        {k: 'clrMB / cbm()', d: 'Alias for clearMaintenanceBypass.'},
-        {k: 'hasMB()', d: 'Alias for hasMaintenanceBypass.'},
-        {k: 'isMaintenanceEnabled()', d: 'Returns true if maintenance flag is enabled in config.'},
-        {k: 'isMaintenanceBlocked() / isM()', d: 'Returns true if this client would be blocked (considers overrides/admin key).'},
-        {k: 'maintenanceAdminKey (config)', d: 'Set in maintenance-config.js to allow admin unlock via ?maintenance_key=KEY'},
-        {k: 'Use admin URL', d: 'Visit any page with ?maintenance_key=KEY to unlock admin (if configured).'}
+        {k: 'setMaintenanceBypass(durationMs?)', d: 'Active un contournement local pour ce client (persisté dans localStorage). Durée optionnelle en ms.'},
+        {k: 'clearMaintenanceBypass()', d: 'Supprime le contournement client.'},
+        {k: 'hasMaintenanceBypass()', d: 'Renvoie true si le contournement client est actif.'},
+        {k: 'setMB / smb(durationMs?)', d: 'Alias de setMaintenanceBypass.'},
+        {k: 'clrMB / cbm()', d: 'Alias de clearMaintenanceBypass.'},
+        {k: 'hasMB()', d: 'Alias de hasMaintenanceBypass.'},
+        {k: 'isMaintenanceEnabled()', d: 'Renvoie true si le mode maintenance est activé dans la configuration.'},
+        {k: 'isMaintenanceBlocked() / isM()', d: 'Renvoie true si ce client serait bloqué (tient compte des contournements et de la clé admin).'},
+        {k: 'maintenanceAdminKey (config)', d: 'Défini dans maintenance-config.js pour permettre le déverrouillage admin via ?maintenance_key=CLE'},
+        {k: 'Use admin URL', d: 'Visitez n\'importe quelle page avec ?maintenance_key=CLE pour déverrouiller l\'admin (si configuré).'}
       ];
-      console.group('%cMaintenance help', 'color: var(--secondary); font-weight:700');
+      console.group('%cAide maintenance', 'color: var(--secondary); font-weight:700');
       cmds.forEach(function(item){
         console.log('%c' + item.k, 'color: #9fb4ff; font-weight:600', '-', item.d);
       });
-      console.log('Example: setMB(60000) — enable bypass for 60s');
+      console.log('Exemple : setMB(60000) — active le bypass pendant 60s');
       console.groupEnd();
       return cmds;
     };
@@ -126,6 +126,6 @@
     // Otherwise redirect to maintenance page.
     window.location.replace('maintenance.html');
   } catch (e) {
-    console.warn('Maintenance check failed', e);
+    console.warn('Vérification de maintenance échouée', e);
   }
 })();

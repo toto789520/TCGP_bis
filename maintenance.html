@@ -9,6 +9,50 @@
     <script src="maintenance-config.js"></script>
     <script src="maintenance.js"></script>
     <meta name="robots" content="noindex">
+    <script>
+        // Show a visible banner on the maintenance page when the client has an override/admin unlock.
+        document.addEventListener('DOMContentLoaded', function(){
+            try {
+                var hasBypass = (window.hasMaintenanceBypass && window.hasMaintenanceBypass()) || (localStorage.getItem && localStorage.getItem('maintenance_client_override') === '1');
+                var adminUnlocked = false;
+                try {
+                    var adminKey = (window.maintenanceAdminKey || '').toString();
+                    var stored = localStorage.getItem('maintenance_admin_unlocked');
+                    if (stored && adminKey && stored === adminKey) adminUnlocked = true;
+                } catch (e) {}
+
+                if (hasBypass || adminUnlocked) {
+                    var container = document.querySelector('.login-box') || document.body;
+                    var banner = document.createElement('div');
+                    banner.style.background = 'linear-gradient(135deg, rgba(59,76,202,0.15), rgba(255,222,0,0.06))';
+                    banner.style.border = '2px solid rgba(59,76,202,0.25)';
+                    banner.style.padding = '12px 16px';
+                    banner.style.borderRadius = '8px';
+                    banner.style.marginBottom = '14px';
+                    banner.style.color = '#cfe0ff';
+                    banner.style.display = 'flex';
+                    banner.style.justifyContent = 'space-between';
+                    banner.style.alignItems = 'center';
+
+                    var msg = document.createElement('div');
+                    msg.innerHTML = '<strong>Accès temporaire activé</strong> — vous avez désactivé la maintenance pour ce navigateur.';
+
+                    var actions = document.createElement('div');
+                    var btnClear = document.createElement('button');
+                    btnClear.className = 'btn-tertiary';
+                    btnClear.textContent = 'Annuler l\'accès';
+                    btnClear.onclick = function(){ try { localStorage.removeItem('maintenance_client_override'); localStorage.removeItem('maintenance_admin_unlocked'); } catch(e){}; location.reload(); };
+                    actions.appendChild(btnClear);
+
+                    banner.appendChild(msg);
+                    banner.appendChild(actions);
+
+                    if (container.firstChild) container.insertBefore(banner, container.firstChild);
+                    else container.appendChild(banner);
+                }
+            } catch (e) { /* ignore */ }
+        });
+    </script>
     <style>
         /* Mailto link styled to match site theme and improve contrast */
         a {
@@ -39,7 +83,7 @@
 </head>
 <body>
     <div class="maintenance-container">
-        <div class="login-box" style="flex-direction: column; gap:0; display:flex; padding:30px; max-width:820px; width:100%; text-align:center;">
+        <div class="login-box" style="flex-direction: column; gap:35px; display:flex; padding:30px; max-width:820px; width:100%; text-align:center;">
             <div class="nav-logo">Poké-TCG Ultimate</div>
             <h1 style="font-size:35px;color:#fff;">Site en maintenance</h1>
             <p style="color:#cfd8e3">Nous effectuons actuellement des opérations de maintenance pour améliorer le service. Le site est temporairement indisponible. Merci de revenir plus tard.</p>
