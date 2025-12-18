@@ -11,7 +11,7 @@
     <meta name="robots" content="noindex">
     <style>
         /* Mailto link styled to match site theme and improve contrast */
-         a {
+        a {
             color: var(--secondary);
             font-weight: 700;
             text-decoration: none;
@@ -25,13 +25,23 @@
         html {
             line-height: 1.4;
         }
+        h1, h2, h3, h4, h5, h6, p {
+            margin: 0;
+            padding: 0;
+        }
+        .maintenance-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
     </style>
 </head>
 <body>
-    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#0b1226 0%, #111827 100%);">
-        <div class="login-box" style="padding:30px; max-width:820px; width:100%; text-align:center;">
+    <div class="maintenance-container">
+        <div class="login-box" style="flex-direction: column; gap:0; display:flex; padding:30px; max-width:820px; width:100%; text-align:center;">
             <div class="nav-logo">Poké-TCG Ultimate</div>
-            <h1 style="font-size:28px;color:#fff;">Site en maintenance</h1>
+            <h1 style="font-size:35px;color:#fff;">Site en maintenance</h1>
             <p style="color:#cfd8e3">Nous effectuons actuellement des opérations de maintenance pour améliorer le service. Le site est temporairement indisponible. Merci de revenir plus tard.</p>
             <p class="maintenance-contact">Pour toute urgence, contactez l'administrateur : <a href="mailto:bryan.drouet24@gmail.com">bryan.drouet24@gmail.com</a></p>
             <p style="color:#9fb4ff;">Vous pouvez également me joindre sur mes réseaux via <a href="https://linktr.ee/Bryan_Drouet" target="_blank" rel="noopener noreferrer">linktr.ee/Bryan_Drouet</a><br>ou en message privé avec le pseudo <strong>Bryan_Drouet</strong>.</p>
